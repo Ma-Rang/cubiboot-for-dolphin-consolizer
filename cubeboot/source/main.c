@@ -39,13 +39,20 @@
 #include "gcm.h"
 #include "bnr.h"
 
+#include "gc_dvd.h"
+#include "dolphin_dvd.h"
+
 typedef struct {
     struct gcm_disk_header header;
     BNR banner;
-    u8 icon_rgb5[160*160*2];
+    u8 icon_rgb5[64*64*2];
+    char path[128];
 } game_asset;
 
-__attribute__((aligned(32))) static game_asset assets[4] = {};
+__attribute__((aligned(32))) static BNR global_banner_buf;
+__attribute__((aligned(32))) static u8 global_png_buf[24 * 1024];
+
+__attribute__((aligned(32))) game_asset assets[32] = {};
 
 static u32 prog_entrypoint, prog_dst, prog_src, prog_len;
 
@@ -72,6 +79,26 @@ void __SYS_PreInit() {
 
     current_dol_len = &_edata - &_start;
     memcpy(current_dol_buf, &_start, current_dol_len);
+}
+
+// helper
+char *FileSuffix(char *path)
+{
+    char *result;
+    int i, n;
+
+    // assert(path != NULL);
+    n = strlen(path);
+    i = n - 1;
+    while ((i > 0) && (path[i] != '.') && (path[i] != '/') && (path[i] != '\\')) {
+        i--;
+    }
+    if ((i > 0) && (i < n - 1) && (path[i] == '.') && (path[i - 1] != '/') && (path[i - 1] != '\\')) {
+        result = path + i;
+    } else {
+        result = path + n;
+    }
+    return result;
 }
 
 int main() {
@@ -154,6 +181,7 @@ int main() {
 #endif
     iprintf("current_dol_len = %d\n", current_dol_len);
 
+#if 0
     // setup config device
     if (mount_available_device() != SD_OK) {
         iprintf("Could not find an inserted SD card\n");
@@ -167,6 +195,38 @@ int main() {
     if (check_load_program()) {
         can_load_dol = true;
     }
+#else
+    // dvd setup
+    // DVDInit();
+
+    // fake settings
+    {
+        memset(&settings, 0, sizeof(settings));
+
+        // cube color
+        settings.cube_color = 0x660089;
+
+        // cube logo
+        settings.cube_logo = NULL;
+
+        // default program
+        settings.default_program = NULL;
+
+        // fallback enable
+        settings.fallback_enabled = 0;
+
+        // progressive enable
+        GXRModeObj *temp = VIDEO_GetPreferredMode(NULL);
+        settings.progressive_enabled = (temp->viTVMode & 3) == VI_PROGRESSIVE ? 1 : 0;
+        iprintf("Detected progressive: %d\n", settings.progressive_enabled);
+
+        // preboot delay
+        settings.preboot_delay_ms = 0;
+
+        // postboot delay
+        settings.postboot_delay_ms = 0;
+    }
+#endif
 
     iprintf("Checkup, done=%08x\n", state->boot_code);
     if (state->boot_code == 0xCAFEBEEF) {
@@ -317,6 +377,8 @@ int main() {
         }
     }
 
+    bool failed_patching = false;
+
     // Copy symbol relocations by region
     iprintf(".reloc section [0x%08x - 0x%08x]\n", reloc_start, reloc_end);
     for (int i = 0; i < (symshdr->sh_size / sizeof(Elf32_Sym)); ++i) {
@@ -342,38 +404,68 @@ int main() {
                 *(u32*)syment[i].st_value = val;
             } else {
                 iprintf("ERROR broken reloc %s = %x\n", current_symname, syment[i].st_value);
+                failed_patching = true;
             }
         }
     }
 
-    // start mocking out the file enum (using SD)
-    for (int i = 0; i < 4; i++) {
-        game_asset *asset = &assets[i];
+    if (failed_patching) {
+        prog_halt("Failed BIOS Patching relocation\n");
+    }
 
-        char part = 0x30 + i;
-        char base_path[128];
-        sprintf(base_path, "/disc/games/%c", part);
+    // local vars
+    file_entry_t ent;
+    int current_asset_index = 0;
+    int ret = 0;
 
-        char boot_path[255];
-        sprintf(boot_path, "%s/boot.bin", base_path);
+    while(1) {
+		ret = dvd_custom_readdir(&ent);
+		iprintf("READDIR ret: %08x\n", ret);
+		if (ent.name[0] == 0)
+			break;
+		if (ent.type != 0)
+			continue;
+        if (strcmp(ent.name, "boot.iso") == 0)
+            continue;
 
-        char banner_path[255];
-        sprintf(banner_path, "%s/opening.bnr", base_path);
+        char *ext = FileSuffix(ent.name);
+        if (strcmp(ext, ".iso") != 0)
+            continue;
 
-        if (load_file_buffer(boot_path, (u8*)&asset->header) != SD_OK) {
-            prog_halt("Failed to load disc header");
-        }
+        iprintf("READDIR ent(%u): %s [len=%d]\n", ent.type, ent.name, strlen(ent.name));
 
-        if (load_file_buffer(banner_path, (u8*)&asset->banner) != SD_OK) {
-            prog_halt("Failed to load banner");
-        }
+        game_asset *asset = &assets[current_asset_index];
+        strcpy(asset->path, "/");
+        strcat(asset->path, ent.name);
 
+        ret = dvd_custom_open(asset->path, FILE_ENTRY_TYPE_FILE);
+		iprintf("OPEN ret: %08x\n", ret);
+
+        // TODO: remove this after testing on hardware
+        udelay(100 * 1000);
+
+        // get fst and disc header
+        DiskHeader *hdr = __DVDFSInit();
         char game_id[8];
-        sprintf(game_id, "%.4s%.2s", asset->header.info.game_code, asset->header.info.maker_code);
+        memcpy(game_id, hdr, 6);
+        game_id[6] = '\x00';
+        iprintf("GAME loaded: %s\n", game_id);
+
+        // open file
+        static dvdfileinfo file;
+        if (!DVDOpen("opening.bnr", &file)) {
+            prog_halt("Could not the banner file\n");
+        }
+
+        // is 32b long
+        dvd_read(&global_banner_buf, sizeof(BNR), file.addr);
+        memcpy(&asset->banner, &global_banner_buf, sizeof(BNR));
 
         char icon_path[255];
-        sprintf(icon_path, "/disc/icons/%s.png", game_id);
+        sprintf(icon_path, "/disc_icons/%s.png", game_id);
+        iprintf("loading icon: %s\n", icon_path);
 
+#if 0
         void *png_buffer = NULL;
         if (load_file_dynamic(icon_path, &png_buffer) != SD_OK) {
             prog_halt("Failed to load disc icon");
@@ -384,14 +476,40 @@ int main() {
         int res = PNGU_GetImageProperties(ctx, &imgProp);
         iprintf("parsed image res = %d, size = %ux%u\n", res, imgProp.imgWidth, imgProp.imgHeight);
 
-        if (imgProp.imgWidth != 160 || imgProp.imgHeight != 160) {
-            prog_halt("The image is not the correct size (160x160)\n");
+        if (imgProp.imgWidth != 64 || imgProp.imgHeight != 64) {
+            prog_halt("The image is not the correct size (64x64)\n");
         }
 
         PNGU_DecodeTo4x4RGB5A3(ctx, imgProp.imgWidth, imgProp.imgHeight, asset->icon_rgb5, 0);
         PNGU_ReleaseImageContext(ctx);
 
         free(png_buffer);
+#else
+        ret = dvd_custom_open(icon_path, FILE_ENTRY_TYPE_FILE);
+        iprintf("OPEN ret: %08x\n", ret);
+        file_status_t *status = dvd_custom_status();
+        if (status->result > 0) {
+            prog_halt("Coult not open icon\n");
+        }
+        iprintf("SIZE: %08llx\n", status->fsize);
+
+        dvd_read(global_png_buf, (24 * 1024), 0);
+        // DumpHex(global_png_buf, 512);
+
+        PNGUPROP imgProp;
+        IMGCTX ctx = PNGU_SelectImageFromBuffer(global_png_buf);
+        int res = PNGU_GetImageProperties(ctx, &imgProp);
+        iprintf("parsed image res = %d, size = %ux%u\n", res, imgProp.imgWidth, imgProp.imgHeight);
+
+        if (imgProp.imgWidth != 64 || imgProp.imgHeight != 64) {
+            prog_halt("The image is not the correct size (64x64) padded to 24kb\n");
+        }
+
+        PNGU_DecodeTo4x4RGB5A3(ctx, imgProp.imgWidth, imgProp.imgHeight, asset->icon_rgb5, 0);
+        PNGU_ReleaseImageContext(ctx);
+#endif
+
+        current_asset_index++;
     }
 
     u8 *image_data = NULL;
@@ -425,6 +543,7 @@ int main() {
 
     // Copy custom icons into place
     set_patch_value(symshdr, syment, symstringdata, "assets", (u32)assets);
+    set_patch_value(symshdr, syment, symstringdata, "asset_count", current_asset_index);
 
     // while(1);
 

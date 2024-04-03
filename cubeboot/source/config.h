@@ -1,7 +1,9 @@
 
-// #define TEST_IPL_PATH
+// #define TEST_IPL_PATH "/gc-ntsc-11.bin"
 // #define FORCE_IPL_LOAD
 // #define DOLPHIN_DELAY_ENABLE
+
+#define CONFIG_ALPHA_RC "25"
 
 // #define USE_FAT_LIBFAT
 #define USE_FAT_FATFS

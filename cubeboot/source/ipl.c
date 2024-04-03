@@ -18,6 +18,8 @@
 #include "crc32.h"
 #include "ipl.h"
 
+#include "gc_dvd.h"
+
 extern GXRModeObj *rmode;
 extern void *xfb;
 
@@ -56,7 +58,7 @@ s8 bios_index = -1;
 bios_item *current_bios;
 
 #ifdef TEST_IPL_PATH
-char *bios_path = "/bios/gc-ntsc-10.bin";
+char *bios_path = TEST_IPL_PATH;
 #else
 char *bios_path = "/ipl.bin";
 #endif
@@ -99,6 +101,18 @@ void load_ipl() {
         iprintf("TEST IPL D, %08x\n", *(u32*)bs2);
     }
 
+#ifdef TEST_IPL_PATH
+    int ret = dvd_custom_open(TEST_IPL_PATH, FILE_ENTRY_TYPE_FILE);
+    iprintf("OPEN ret: %08x\n", ret);
+
+    dvd_read(bios_buffer, IPL_SIZE, 0);
+    iprintf("TEST IPL A, %08x\n", *(u32*)bios_buffer);
+    iprintf("TEST IPL C, %08x\n", *(u32*)(bios_buffer + DECRYPT_START));
+    Descrambler(bios_buffer + DECRYPT_START, IPL_ROM_FONT_SJIS - DECRYPT_START);
+    memcpy(bs2, bios_buffer + BS2_CODE_OFFSET, bs2_size);
+    iprintf("TEST IPL D, %08x\n", *(u32*)bs2);
+#endif
+
     u32 crc = csp_crc32_memory(bs2, bs2_size);
     iprintf("Read BS2 crc=%08x\n", crc);
 
@@ -119,6 +133,24 @@ void load_ipl() {
 #endif
 
     if (!valid) {
+        // #include "fatfs/ff.h"
+
+        // DIR dir;
+        // FRESULT lastRet = f_opendir(&dir, "/bios-sfn");
+        // if (lastRet != FR_OK)
+        // {
+        //     prog_halt("badA");
+        // }
+
+        // int count = 0;
+        // FILINFO fno;
+        // while ((lastRet = f_readdir(&dir, &fno)) == FR_OK && count < 10) {
+        //     iprintf("Found %s\n", fno.fname);
+        //     count++;
+        // }
+
+        // f_closedir(&dir);
+
         int size = get_file_size(bios_path);
         if (size == SD_FAIL) {
             char err_buf[255];

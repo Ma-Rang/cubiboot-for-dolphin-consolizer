@@ -11,6 +11,8 @@
 `patches/source/asm.h`: credit to swiss-gc <br/>
 `patches/source/os.c`: credit to swiss-gc <br/>
 `patches/source/usbgecko.c`: credit to swiss-gc <br/>
+`patches/source/gc_dvd.c` credit to wii64 <br/>
+`patches/source/gc_dvd.h` credit to wii64 <br/>
 `patches/source/picolibc`: credit to picolibc and newlib <br/>
 `patches/source/tinyprintf`: credit to tinyprintf <br/>
 `patches/source/time.c` credit to libogc <br/>
@@ -22,6 +24,10 @@
 `cubeboot/source/fatfs` credit to iplboot <br/>
 `cubeboot/source/pff` credit to swiss-gc <br/>
 `cubeboot/source/pngu` credit to GRRLIB <br/>
+`cubeboot/source/dolphin_dvd.c` credit to FRAY <br/>
+`cubeboot/source/dolphin_dvd.h` credit to FRAY <br/>
+`cubeboot/source/gc_dvd.c` credit to wii64 <br/>
+`cubeboot/source/gc_dvd.h` credit to wii64 <br/>
 `cubeboot/source/gcode.c` credit to libogc2 <br/>
 `cubeboot/source/gcode.h` credit to libogc2 <br/>
 `cubeboot/source/lwp_queue.inl` credit to libogc <br/>

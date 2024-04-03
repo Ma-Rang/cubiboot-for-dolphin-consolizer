@@ -2,7 +2,9 @@
 #include <stdarg.h>
 
 #include "../attr.h"
+#include "config.h"
 
+#ifdef USE_NATIVE_SPRINTF
 typedef void* (*WriteProc_t)(void*, const char*, size_t);
 
 __attribute_reloc__ int (*__pformatter)(WriteProc_t WriteProc, void* WriteProcArg, const char* format_str, va_list arg);
@@ -30,3 +32,4 @@ int vsnprintf(char* s, size_t n, const char* format, va_list arg) {
 
 	return end;
 }
+#endif

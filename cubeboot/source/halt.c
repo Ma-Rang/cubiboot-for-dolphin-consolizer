@@ -23,8 +23,8 @@ void prog_halt(char *msg) {
     console_init(exception_xfb,20,20,rmode->fbWidth,rmode->xfbHeight,rmode->fbWidth*VI_DISPLAY_PIX_SZ);
     // CON_EnableGecko(EXI_CHANNEL_1, false);
 #endif
-    printf("\n====\nHALT\n====\n");
-    printf(msg);
+    iprintf("\n====\nHALT\n====\n");
+    iprintf(msg);
 #ifdef VIDEO_ENABLE
     VIDEO_WaitVSync();
 #endif

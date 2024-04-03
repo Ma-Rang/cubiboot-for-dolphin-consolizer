@@ -26,20 +26,25 @@
 
 #include "config.h"
 
+#ifndef USE_NATIVE_SPRINTF
+#define TINYPRINTF_OVERRIDE_LIBC 1
+#include "tinyprintf/tinyprintf.h"
+#endif
+
 #ifdef DOLPHIN_PRINT_ENABLE
 
-__attribute_reloc__ u32 *uart_init;
-__attribute_reloc__ u32 (*InitializeUART)(u32);
-__attribute_reloc__ s32 (*WriteUARTN)(const void *buf, u32 len);
+// __attribute_reloc__ u32 *uart_init;
+// __attribute_reloc__ u32 (*InitializeUART)(u32);
+// __attribute_reloc__ s32 (*WriteUARTN)(const void *buf, u32 len);
 
-s32 dolphin_WriteUARTN(const void *buf, u32 len) {
-  if (*uart_init == 0) {
-	InitializeUART(0xe100);
-    *uart_init = 1;
-  }
+// s32 dolphin_WriteUARTN(const void *buf, u32 len) {
+//   if (*uart_init == 0) {
+// 	InitializeUART(0xe100);
+//     *uart_init = 1;
+//   }
 
-	return WriteUARTN(buf, len);
-}
+// 	return WriteUARTN(buf, len);
+// }
 
 #define custom_WriteUARTN dolphin_WriteUARTN
 

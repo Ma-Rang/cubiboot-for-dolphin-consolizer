@@ -14,6 +14,8 @@
 #include "reloc.h"
 #include "menu.h"
 
+#include "gc_dvd.h"
+
 #define CUBE_TEX_WIDTH 84
 #define CUBE_TEX_HEIGHT 84
 
@@ -296,10 +298,10 @@ __attribute_used__ void pre_main() {
         rmode->vfilter[6] = 0;
     }
 
-    // can't boot dol
-    if (!start_game) {
-        cube_color = 0x4A412A; // or 0x0000FF
-    }
+    // // can't boot dol
+    // if (!start_game) {
+    //     cube_color = 0x4A412A; // or 0x0000FF
+    // }
 
     OSReport("LOADCMD %x, %x, %x, %x\n", prog_entrypoint, prog_dst, prog_src, prog_len);
     memmove((void*)prog_dst, (void*)prog_src, prog_len);
@@ -356,14 +358,70 @@ __attribute_used__ u32 bs2tick() {
         return STATE_START_GAME;
     }
 
-    if (TEST_ONLY_skip_animation) {
-        return STATE_COVER_OPEN;
-    }
+    // if (TEST_ONLY_skip_animation) {
+    //     return STATE_COVER_OPEN;
+    // }
 
     // TODO: allow the user to decide if they want to logo to play
     // return STATE_COVER_OPEN;
     return STATE_NO_DISC;
 }
+
+__attribute__((aligned(32))) static u8 apploader_buf[0x20];
+void* LoadGame_Apploader() {
+    // variables
+    int err;
+    void *buffer = &apploader_buf[0];
+    void (*app_init)(void (*report)(const char *fmt, ...));
+    int (*app_main)(void **dst, int *size, int *offset);
+    void *(*app_final)();
+    void (*app_entry)(void(**init)(void (*report)(const char *fmt, ...)), int (**main)(void**,int*,int*), void *(**final)());
+
+    // // disable interrupts
+    // u32 msr;
+    // msr = GetMSR();
+    // msr &= ~0x8000;
+    // msr |= 0x2002;
+    // SetMSR(msr);
+
+    // start disc drive & read apploader
+    err = DVD_LowRead64(buffer,0x20,0x2440);
+    if (err) {
+        OSReport("Could not load apploader header\n");
+        while(1);
+    }
+    err = DVD_LowRead64((void*)0x81200000,((*(unsigned long*)((u32)buffer+0x14)) + 31) &~31,0x2460);
+    if (err) {
+        OSReport("Could not load apploader data\n");
+        while(1);
+    }
+
+    // run apploader
+    app_entry = (void (*)(void(**)(void(*)(const char*,...)),int(**)(void**,int*,int*),void*(**)()))(*(unsigned long*)((u32)buffer + 0x10));
+    app_entry(&app_init,&app_main,&app_final);
+    app_init((void(*)(const char*,...))&custom_OSReport);
+    for (;;)
+    {
+        void *dst = 0;
+        int len = 0,offset = 0;
+        int res = app_main(&dst,&len,&offset);
+		OSReport("res = %d\n", res);
+        if (!res) break;
+        err = DVD_LowRead64(dst,len,offset);
+        if (err) {
+            OSReport("Apploader read failed\n");
+            while(1);
+        }
+        DCFlushRange(dst,len);
+    }
+	OSReport("GOT ENTRY\n");
+
+    void* entrypoint = app_final();
+    OSReport("THIS ENTRY, %p\n", entrypoint);
+    return entrypoint;
+}
+
+extern char boot_path[];
 
 __attribute_used__ void bs2start() {
     OSReport("DONE\n");
@@ -371,14 +429,30 @@ __attribute_used__ void bs2start() {
     memcpy(global_state, &local_state, sizeof(cubeboot_state));
     global_state->boot_code = 0xCAFEBEEF;
 
+    // if (prog_entrypoint == 0) {
+    //     OSReport("HALT: No program\n");
+    //     while(1); // block forever
+    // }
+
+    // TODO: remove this after testing on hardware
+    OSReport("we are about to look at %08x\n", (u32)boot_path);
+    udelay(100 * 1000);
+
+    int ret = dvd_custom_open(boot_path);
+    OSReport("OPEN ret: %08x\n", ret);
+
+    prog_entrypoint = (u32)LoadGame_Apploader();
+
+    OSReport("booting...\n");
+
     while (!PADSync());
     OSDisableInterrupts();
     __OSStopAudioSystem();
 
-    if (prog_entrypoint == 0) {
-        OSReport("HALT: No program\n");
-        while(1); // block forever
-    }
+    // if (prog_entrypoint == 0) {
+    //     OSReport("HALT: No program\n");
+    //     while(1); // block forever
+    // }
 
     void (*entry)(void) = (void(*)(void))prog_entrypoint;
     run(entry, 0x81300000, 0x20000);

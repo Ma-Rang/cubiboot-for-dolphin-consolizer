@@ -1,6 +1,6 @@
 #include "os.h"
 
-#if 0
+#if 1
 void DCInvalidateRange(void *addr, u32 nBytes)
 {
 	if (!nBytes) return;

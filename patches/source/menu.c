@@ -18,6 +18,7 @@
 __attribute_reloc__ void (*menu_alpha_setup)();
 
 // for custom menus
+__attribute_reloc__ void (*prep_text_mode)();
 __attribute_reloc__ void (*gx_draw_text)(u16 index, text_group* text, text_draw_group* text_draw, GXColor* color);
 __attribute_reloc__ void (*setup_gameselect_menu)(u8 alpha_0, u8 alpha_1, u8 alpha_2);
 __attribute_reloc__ GXColorS10 *(*get_save_color)(u32 color_index, s32 save_type);
@@ -75,10 +76,13 @@ __attribute_reloc__ u32 *banner_ready;
 typedef struct {
     struct gcm_disk_header header;
     BNR banner;
-    u8 icon_rgb5[160*160*2];
+    u8 icon_rgb5[64*64*2];
+    char path[128];
 } game_asset;
 
 game_asset *assets;
+__attribute_data__ int asset_count;
+__attribute_data__ char boot_path[128];
 
 typedef struct {
     f32 scale;
@@ -90,7 +94,7 @@ static position_t icons_positions[40];
 
 __attribute__((aligned(4))) static tex_data banner_texture;
 
-void draw_text(char *s, s16 size, u16 x, u16 y, u8 alpha) {
+void draw_text(char *s, s16 size, u16 x, u16 y, GXColor *color) {
     static struct {
         text_group group;
         text_metadata metadata;
@@ -133,8 +137,7 @@ void draw_text(char *s, s16 size, u16 x, u16 y, u8 alpha) {
     draw.metadata.x = (x + 64) * 20;
     draw.metadata.y = (y + 64) * 10;
 
-    GXColor white = {0xFF, 0xFF, 0xFF, alpha};
-    gx_draw_text(0, &text.group, &draw.group, &white);
+    gx_draw_text(0, &text.group, &draw.group, color);
 }
 
 __attribute_data__ u16 anim_step = 0;
@@ -208,8 +211,8 @@ __attribute_used__ void custom_gameselect_init() {
     // change the texture format (disc scans)
     tex_data *textured_icon_tex = &textured_icon->data->tex->dat[1];
     textured_icon_tex->format = GX_TF_RGB5A3;
-    textured_icon_tex->width = 160;
-    textured_icon_tex->height = 160;
+    textured_icon_tex->width = 64;
+    textured_icon_tex->height = 64;
 
     // banner image
     banner_texture.format = GX_TF_RGB5A3;
@@ -396,19 +399,19 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     GXColor white = {0xFF, 0xFF, 0xFF, ui_alpha};
 
     // text
-    draw_text("cubeboot loader", 20, 20, 4, ui_alpha);
+    draw_text("cubeboot loader", 20, 20, 4, &white);
 
     // box
     draw_info_box(&white);
 
-    if (selected_slot < 4) {
+    if (selected_slot < asset_count) {
         // info
         draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, assets[selected_slot].banner.desc->fullGameName, 0x1f);
         draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, assets[selected_slot].banner.desc->description, 0x1f);
 
         // game source
         draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
-        draw_text("ISO", 20, 125, 540, ui_alpha);
+        draw_text("ISO", 20, 125, 540, &white);
 
         // banner image
         setup_tex_draw(1, 0, 1);
@@ -422,7 +425,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
             for (int col = 0; col < 8; col++) {
                 int slot_num = (row * 8) + col;
 
-                bool has_texture = (slot_num < 4);
+                bool has_texture = (slot_num < asset_count);
                 bool selected = (slot_num == selected_slot);
 
                 if (selected && pass == 0) continue; // skip selected icon on first pass
@@ -542,7 +545,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_A && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
-        if (selected_slot < 4) {
+        if (selected_slot < asset_count) {
             in_submenu_transition = true;
             current_gameselect_state = SUBMENU_GAMESELECT_START;
             *banner_pointer = (u32)&assets[selected_slot].banner; // banner buf
@@ -556,6 +559,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();
         Jac_PlaySe(SOUND_MENU_FINAL);
+        strcpy(boot_path, assets[selected_slot].path);
         *bs2start_ready = 1;
     }
 
@@ -602,4 +606,12 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     return MENU_GAMESELECT_TRANSITION_ID;
+}
+
+void alpha_watermark(void) {
+    prep_text_mode();
+
+    GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
+    draw_text("ALPHA TEST", 24, 330, 0, &yellow_alpha);
+    draw_text("cubeboot rc" CONFIG_ALPHA_RC, 22, 330, 28, &yellow_alpha);
 }

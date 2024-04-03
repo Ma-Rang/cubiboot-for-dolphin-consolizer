@@ -38,7 +38,9 @@ ntsc11_cur_menu_id = 0x81481554;
 
 ntsc11_get_save_color = 0x81320424;
 ntsc11_draw_grid = 0x8130b32c;
+ntsc11_prep_text_mode = 0x81309750;
 ntsc11_gx_draw_text = 0x8130a6b8;
+
 ntsc11_setup_gameselect_menu = 0x813272f8;
 ntsc11_setup_gameselect_anim = 0x8132703c;
 ntsc11_setup_cube_anim = 0x81328c20;

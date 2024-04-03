@@ -15,6 +15,8 @@
 #include "helpers.h"
 
 #ifndef USE_FAT_PFF
+typedef uint64_t LBA_t;
+typedef unsigned char BYTE;
 #include "fatfs/diskio.h"
 #endif
 

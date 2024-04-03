@@ -12,3 +12,5 @@ BS2 only needs ~5MB of Heap, so `heap_start` can safely be moved to 0x80800000 o
 BS2 runs OSInit which clears high-mem up to 0x81700000
 
 Patches for BS2 can safely be placed at 0x81700000
+
+In game, VIConfigure panics if 0x800000CC doesn't match the TV mode about to be configured
