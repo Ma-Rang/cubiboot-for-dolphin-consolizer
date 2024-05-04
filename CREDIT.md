@@ -17,6 +17,7 @@
 `patches/source/tinyprintf`: credit to tinyprintf <br/>
 `patches/source/time.c` credit to libogc <br/>
 `patches/source/arith64.c` credit to github.com/glitchub/arith64 <br/>
+`patches/include/gx_regdef.h` credit to libogc2 <br/>
 
 <hr/>
 

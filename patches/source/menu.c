@@ -335,7 +335,7 @@ __attribute_used__ void draw_info_box(GXColor *color) {
     return;
 }
 
-// #define WITH_SPACE 1
+#define WITH_SPACE 1
 
 __attribute_used__ void update_icon_positions() {
 #if defined(WITH_SPACE) && WITH_SPACE
@@ -396,6 +396,12 @@ void set_gameselect_view(Mtx matrix, Mtx inverse) {
     C_MTXCopy(inverse, global_gameselect_inverse);
 }
 
+void fix_gameselect_view() {
+    GX_LoadPosMtxImm(global_gameselect_matrix,0);
+    GX_LoadNrmMtxImm(global_gameselect_inverse,0);
+    GX_SetCurrentMtx(0);
+}
+
 __attribute_data__ u32 current_gameselect_state = SUBMENU_GAMESELECT_LOADER;
 __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8 broken_alpha_2) {
     // color
@@ -405,6 +411,28 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
 
     // text
     draw_text("cubeboot loader", 20, 20, 4, &white);
+
+    // icons
+    for (int pass = 0; pass < 2; pass++) {
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 8; col++) {
+                int slot_num = (row * 8) + col;
+
+                bool has_texture = (slot_num < asset_count);
+                bool selected = (slot_num == selected_slot);
+
+                if (selected && pass == 0) continue; // skip selected icon on first pass
+                if (!selected && pass == 1) continue; // skip unselected icons on second pass
+                draw_save_icon(slot_num, alpha_1, selected, has_texture);
+            }
+        }
+    }
+
+    // arrows
+    fix_gameselect_view();
+    setup_tex_draw(1, 0, 0);
+    void (*draw_named_tex)(u32 type, void *blob, GXColor *color, s16 x, s16 y) = (void*)0x8130a36c;
+    draw_named_tex(make_type('a','r','a','d'), menu_blob, &white, 0x800 - 100, 0); // TODO: y pos
 
     // box
     if (rmode->viTVMode >> 2 == VI_NTSC) // quirk
@@ -423,22 +451,6 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
         setup_tex_draw(1, 0, 1);
         banner_texture.offset = (s32)((u32)(assets[selected_slot].banner.pixelData) - (u32)&banner_texture);
         draw_blob_tex(make_type('b','a','n','a'), menu_blob, &white, &banner_texture);
-    }
-
-    // icons
-    for (int pass = 0; pass < 2; pass++) {
-        for (int row = 0; row < 4; row++) {
-            for (int col = 0; col < 8; col++) {
-                int slot_num = (row * 8) + col;
-
-                bool has_texture = (slot_num < asset_count);
-                bool selected = (slot_num == selected_slot);
-
-                if (selected && pass == 0) continue; // skip selected icon on first pass
-                if (!selected && pass == 1) continue; // skip unselected icons on second pass
-                draw_save_icon(slot_num, alpha_1, selected, has_texture);
-            }
-        }
     }
 
     return;
