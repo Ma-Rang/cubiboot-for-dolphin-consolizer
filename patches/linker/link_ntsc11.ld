@@ -1,7 +1,6 @@
 /* debug: __OSGetSystemTime = 0x8136023c; */
 /* debug: __OSBusClock = 0x800000f8; */
 
-/* videomode: rmode = 0x8137d9f0; */
 /* videomode: heap_init = 0x81307d90; */
 
 ntsc11_Jac_PlaySe = 0x813574a0;

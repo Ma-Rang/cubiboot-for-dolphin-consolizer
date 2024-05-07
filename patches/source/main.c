@@ -64,7 +64,6 @@ __attribute_reloc__ model *bg_inner_model;
 __attribute_reloc__ model *gc_text_model;
 __attribute_reloc__ model *logo_model;
 __attribute_reloc__ model *cube_model;
-__attribute_reloc__ state *cube_state;
 
 // locals
 __attribute_data__ static GXColorS10 color_cube;
@@ -283,8 +282,19 @@ __attribute_used__ void pre_main() {
             rmode->viHeight = 448;
         }
 
+        // // sample points arranged in increasing Y order
+        // u8  sample_pattern[12][2] = {
+        //     {6,6},{6,6},{6,6},  // pix 0, 3 sample points, 1/12 units, 4 bits each
+        //     {6,6},{6,6},{6,6},  // pix 1
+        //     {6,6},{6,6},{6,6},  // pix 2
+        //     {6,6},{6,6},{6,6}   // pix 3
+        // };
+        // memcpy(&rmode->sample_pattern[0][0], &sample_pattern[0][0], (12*2));
+
         rmode->viTVMode = VI_TVMODE_NTSC_PROG;
         rmode->xfbMode = VI_XFBMODE_SF;
+        // rmode->aa = FALSE; // breaks the IPL??
+        // rmode->field_rendering = TRUE;
 
         rmode->vfilter[0] = 0;
         rmode->vfilter[1] = 0;
@@ -312,6 +322,36 @@ __attribute_used__ u32 get_tvmode() {
     return rmode->viTVMode;
 }
 
+// from https://github.com/zeldaret/tp/blob/e1147cf047a525242178bd0ec39c8ed88a2633f1/include/dolphin/arq.h#L12-L37
+typedef void (*ARQCallback)(u32 request_address);
+
+typedef enum _ARamType {
+    ARAM_DIR_MRAM_TO_ARAM,
+    ARAM_DIR_ARAM_TO_MRAM,
+} ARamType;
+
+typedef enum _ArqPriotity {
+    ARQ_PRIORITY_LOW,
+    ARQ_PRIORITY_HIGH,
+} ArqPriotity;
+
+typedef struct ARQRequest {
+    struct ARQRequest* next;
+    u32 owner;
+    u32 type;
+    u32 priority;
+    u32 source;
+    u32 destination;
+    u32 length;
+    ARQCallback callback;
+} ARQRequest;
+
+void aram_done(u32 request_address) {
+    OSReport("Copy Done\n");
+}
+
+__attribute_data__ ARQRequest arq_request;
+__attribute_data__ int frame_count = 0;
 __attribute_used__ u32 bs2tick() {
     // TODO: move this check to PADRead in main loop
     if (pad_status->pad.button != local_state.last_buttons) {
@@ -333,9 +373,13 @@ __attribute_used__ u32 bs2tick() {
     }
     local_state.last_buttons = pad_status->pad.button;
 
+    frame_count++;
     if (!completed_time && cube_state->cube_anim_done) {
-        OSReport("FINISHED\n");
+        OSReport("FINISHED (%d)\n", frame_count);
         completed_time = gettime();
+
+        // void (*ARQPostRequest)(ARQRequest *task, u32 owner, u32 type, u32 priority, u32 source, u32 dest, u32 length, ARQCallback callback) = (void*)0x8136ab80;
+        // ARQPostRequest(&arq_request, 0, ARAM_DIR_MRAM_TO_ARAM, ARQ_PRIORITY_LOW, (u32)0x80300000, 0x0200000, (14 * 1024 * 1024), &aram_done);
     }
 
     // this helps the start menu show correctly

@@ -11,3 +11,6 @@ extern bios_pad *pad_status;
 extern u32 *prev_menu_id;
 extern u32 *cur_menu_id;
 extern GXRModeObj *rmode;
+
+// from main
+extern state *cube_state;

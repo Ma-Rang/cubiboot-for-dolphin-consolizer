@@ -217,9 +217,11 @@ int main() {
         settings.fallback_enabled = 0;
 
         // progressive enable
-        GXRModeObj *temp = VIDEO_GetPreferredMode(NULL);
-        settings.progressive_enabled = (temp->viTVMode & 3) == VI_PROGRESSIVE ? 1 : 0;
-        iprintf("Detected progressive: %d\n", settings.progressive_enabled);
+        // GXRModeObj *temp = VIDEO_GetPreferredMode(NULL);
+        // settings.progressive_enabled = (temp->viTVMode & 3) == VI_PROGRESSIVE ? 1 : 0;
+        // iprintf("Detected progressive: %d\n", settings.progressive_enabled);
+        settings.progressive_enabled = 1;
+        // settings.progressive_enabled = 0;
 
         // preboot delay
         settings.preboot_delay_ms = 0;
@@ -458,6 +460,8 @@ int main() {
             prog_halt("Could not open the banner file\n");
         }
 
+        iprintf("BNR Opened\n");
+
         // setup asset
         game_asset *asset = &assets[current_asset_index];
         strcpy(asset->path, iso_path);
@@ -465,6 +469,8 @@ int main() {
         // is 32b long
         dvd_read(&global_banner_buf, sizeof(BNR), file.addr);
         memcpy(&asset->banner, &global_banner_buf, sizeof(BNR));
+
+        iprintf("BNR Read complete\n");
 
         char icon_path[255];
         sprintf(icon_path, "/disc_icons/%s.png", game_id);
@@ -515,6 +521,7 @@ int main() {
 #endif
 
         current_asset_index++;
+        // break;
     }
 
     u8 *image_data = NULL;

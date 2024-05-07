@@ -2,6 +2,9 @@
 #include <stdarg.h>
 
 int vsnprintf(char* s, size_t n, const char* format, va_list arg);
+int vsprintf(char* s, const char* format, va_list arg);
+int snprintf(char* s, size_t n, const char* format, ...);
+int sprintf(char* s, const char* format, ...);
 
 void *memmove(void *dst, const void *src, size_t length);
 void *memcpy(void* dst, const void* src, size_t count);

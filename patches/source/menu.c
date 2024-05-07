@@ -1,3 +1,4 @@
+#include <math.h>
 #include "picolibc.h"
 #include "structs.h"
 
@@ -10,6 +11,7 @@
 #include "usbgecko.h"
 #include "menu.h"
 
+// TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
 #include "../build/default_opening_bin.h"
 #include "../../cubeboot/include/gcm.h"
 #include "../../cubeboot/include/bnr.h"
@@ -86,11 +88,55 @@ __attribute_data__ char boot_path[128];
 
 typedef struct {
     f32 scale;
+    f32 opacity;
     Mtx m;
 } position_t;
 
 static position_t icons_positions[40];
 // static asset_t (*game_assets)[40] = 0x80400000; // needs ~2.5mb
+
+
+// START file browser
+typedef struct {
+    char file_name[128]; // needs to be bumped to 128
+    char game_name[64]; // needs to be bumped to 128
+} game_dirent_t;
+
+game_dirent_t current_directory[256];
+
+// game_item_t game_items[32][8];
+
+// line_order
+
+// line animation list [8] depth
+// get anim push / pop working
+
+
+
+// first press -> lines 0, 1, 2, 3, 4 move up 
+
+
+
+// Define constants for max dimensions
+#define MAX_LINES 6
+#define MAX_ANIMATIONS_PER_LINE 4
+
+// Define the struct
+typedef struct {
+    bool is_animating;
+    signed char queue_index;
+    unsigned char current_frame;
+    int start_pos;
+    int end_pos;
+} line_anim_t;
+
+// Define the array to hold animations
+line_anim_t line_animation_list[MAX_LINES][MAX_ANIMATIONS_PER_LINE];
+
+
+
+// END file browser
+
 
 __attribute__((aligned(4))) static tex_data banner_texture;
 
@@ -232,6 +278,17 @@ __attribute_used__ void custom_gameselect_init() {
     banner_texture.unk8 = 0x01; // used by GX_InitTexObjLOD
     banner_texture.unk9 = 0x00;
     banner_texture.unk10 = 0x00;
+
+    // // init anim list
+    // for (int line_num = 0; line_num < 6; line_num++) {
+    //     int anim_slot = 0; // TODO: increase num of slots
+    //     line_anim_t *anim = &line_animation_list[line_num][anim_slot];
+    //     anim->is_animating = false;
+    //     anim->queue_index = -1;
+    //     anim->start_pos = 0;
+    //     anim->end_pos = 0;
+    //     anim->current_frame = 0;
+    // }
 }
 
 int selected_slot = 0;
@@ -265,7 +322,7 @@ __attribute_used__ void draw_save_icon(u32 index, u8 alpha, bool selected, bool 
     change_model(m);
 
     // draw icon
-    m->alpha = alpha;
+    m->alpha = (u8)((f32)alpha * pos->opacity);
     if (has_texture) {
         // cube
         draw_partial(m, &m->data->parts[2]);
@@ -274,7 +331,7 @@ __attribute_used__ void draw_save_icon(u32 index, u8 alpha, bool selected, bool 
         // icon
         tex_data *icon_tex = &m->data->tex->dat[1];
         // u32 target_texture_data = (u32)assets[index].icon_rgb5;
-        u16 *source_texture_data = (u16*)assets[index].banner.pixelData;
+        u16 *source_texture_data = (u16*)assets[0].banner.pixelData;
         u32 target_texture_data = (u32)source_texture_data;
 
         s32 desired_offset = (s32)((u32)target_texture_data - (u32)icon_tex);
@@ -336,6 +393,7 @@ __attribute_used__ void draw_info_box(GXColor *color) {
 }
 
 #define WITH_SPACE 1
+u32 move_frame = 0;
 
 __attribute_used__ void update_icon_positions() {
 #if defined(WITH_SPACE) && WITH_SPACE
@@ -345,10 +403,31 @@ __attribute_used__ void update_icon_positions() {
 #endif
     const int base_y = 118;
 
-    for (int row = 0; row < 4; row++) {
+    for (int row = 0; row < 5; row++) {
+        f32 mod_pos_y = 0;
+        f32 mod_opacity = 1.0;
+        // if (row == 0 || row == 1 || row == 2) {
+        //     u32 anim_slot = 0;
+        //     line_anim_t *anim = &line_animation_list[0][anim_slot];
+        //     if (anim->is_animating) {
+        //         mod_pos_y = 5.0 * pow(anim->current_frame * 0.1, 1.8);
+        //         mod_opacity = (60.0 - (f32)anim->current_frame) / 60.0;
+
+        //         OSReport("current = %u, mod_pos_y = %f\n", anim->current_frame, mod_pos_y);
+
+        //         if (mod_pos_y > anim->end_pos) {
+        //             anim->is_animating = false;
+        //             move_frame = 0;
+        //             anim->queue_index = -1;
+        //         }
+
+        //         if (row == 0) anim->current_frame++;
+        //     }
+        // }
         for (int col = 0; col < 8; col++) {
             int slot_num = (row * 8) + col;
             position_t *pos = &icons_positions[slot_num];
+            pos->opacity = mod_opacity;
 
             f32 sc = 1.3;
             if (slot_num == selected_slot) {
@@ -499,9 +578,7 @@ __attribute_used__ void mod_gameselect_draw(u8 alpha_0, u8 alpha_1, u8 alpha_2) 
     setup_gameselect_menu(0, 0, 0);
     draw_grid(global_gameselect_matrix, alpha_1);
 
-    // original_gameselect_menu(alpha_0, alpha_1, alpha_2); // fix alpha_0 + alpha_2?
-
-    // // TODO: use GXColor instead of alpha byte
+    // TODO: use GXColor instead of alpha byte
     u8 custom_alpha_1 = custom_menu_transition_alpha;
     u8 original_alpha_1 = original_menu_transition_alpha;
 
@@ -546,15 +623,23 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     if (pad_status->buttons_down & PAD_TRIGGER_Z) {
-        // placeholder
+        // get_free_anim_slot()
+        //     // TODO: find next anim slot
+        //     u32 anim_slot = 0;
+        //     line_anim_t *anim = &line_animation_list[0][anim_slot];
+        //     anim->is_animating = true;
+        //     anim->queue_index = 0;
+        //     anim->start_pos = 0;
+        //     anim->end_pos = 120;
+        //     anim->current_frame = 0;
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_B) {
-        if (current_gameselect_state == SUBMENU_GAMESELECT_START) {
+        if (current_gameselect_state == SUBMENU_GAMESELECT_START && !in_submenu_transition) {
             in_submenu_transition = true;
             current_gameselect_state = SUBMENU_GAMESELECT_LOADER;
             Jac_PlaySe(SOUND_SUBMENU_EXIT);
-        } else {
+        } else if (!in_submenu_transition) {
             anim_step = 0; // anim reset
             *banner_pointer = (u32)&default_opening_bin[0]; // banner reset
             Jac_PlaySe(SOUND_MENU_EXIT);
@@ -563,7 +648,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_A && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
-        if (selected_slot < asset_count) {
+        if (selected_slot < asset_count && !in_submenu_transition) {
             in_submenu_transition = true;
             current_gameselect_state = SUBMENU_GAMESELECT_START;
             *banner_pointer = (u32)&assets[selected_slot].banner; // banner buf
@@ -603,7 +688,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         }
 
         if (pad_status->analog_down & ANALOG_DOWN) {
-            if ((32 - selected_slot) <= 8) {
+            if (((5 * 8) - selected_slot) <= 8) {
                 Jac_PlaySe(SOUND_CARD_ERROR);
             }
             else {

@@ -3,7 +3,10 @@
 #include "patch_asm.h"
 
 // patch_inst vNTSC_11(_change_background_color) 0x81481cc8 .4byte 0xFFFF00FF
-// patch_inst vNTSC_11(_test_only) 0x813270c8 nop
+// patch_inst vNTSC_11(_test_only_a) 0x81301210 li r3, 0
+// patch_inst vNTSC_11(_test_only_b) 0x813010e4 trap
+patch_inst vNTSC_11(_skip_menu_logo) 0x8130d178 li r3, 5
+
 // patch_inst vNTSC_11(_force_english_lang) 0x8130b73c li r0, 0 // NTSC Only
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
 

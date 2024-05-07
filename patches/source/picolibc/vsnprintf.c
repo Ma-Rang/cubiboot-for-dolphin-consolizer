@@ -16,7 +16,7 @@ typedef struct {
 	size_t CharsWritten;
 } __OutStrCtrl;
 
-// from https://github.com/projectPiki/pikmin2/blob/0285984b81a1c837063ae1852d94607fdb21d64c/src/Dolphin/MSL_C/MSL_Common/printf.c#L1267-L1282
+// from https://github.com/projectPiki/pikmin2/blob/0285984b81a1c837063ae1852d94607fdb21d64c/src/Dolphin/MSL_C/MSL_Common/printf.c#L1267-L1310
 int vsnprintf(char* s, size_t n, const char* format, va_list arg) {
 	int end;
 	__OutStrCtrl osc;
@@ -31,5 +31,21 @@ int vsnprintf(char* s, size_t n, const char* format, va_list arg) {
 	}
 
 	return end;
+}
+
+int vsprintf(char* s, const char* format, va_list arg) {
+	return vsnprintf(s, 0xFFFFFFFF, format, arg);
+}
+
+int snprintf(char* s, size_t n, const char* format, ...) {
+	va_list args;
+	va_start(args, format);
+	return vsnprintf(s, n, format, args);
+}
+
+int sprintf(char* s, const char* format, ...) {
+	va_list args;
+	va_start(args, format);
+	return vsnprintf(s, 0xFFFFFFFF, format, args);
 }
 #endif
