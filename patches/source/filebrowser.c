@@ -172,7 +172,7 @@ void *file_enum_worker(void* param) {
     OSReport("Current lines = %d\n", number_of_lines);
 
     // test only
-    // number_of_lines = 20;
+    number_of_lines = 20;
     grid_setup_func();
 
     OSReport("SECOND File enum:\n");

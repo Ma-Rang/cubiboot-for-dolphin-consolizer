@@ -94,6 +94,19 @@ typedef struct {
 } position_t;
 
 static position_t icons_positions[8];
+
+typedef struct {
+    s32 rot_diff_x;
+    s32 rot_diff_y;
+    s32 rot_diff_z;
+
+    f32 move_diff_y;
+    f32 move_diff_z;
+} selected_mod_t;
+
+static selected_mod_t selected_icon_mod;
+
+
 // static asset_t (*game_assets)[40] = 0x80400000; // needs ~2.5mb
 
 // Define constants for max dimensions
@@ -248,6 +261,7 @@ __attribute_used__ void custom_gameselect_init() {
 }
 
 int selected_slot = 0;
+s32 top_line_num = 0;
 
 __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, bool selected, bool has_texture) {
     f32 sc = pos->scale;
@@ -375,55 +389,18 @@ void setup_icon_positions() {
     }
 }
 
-#if 0
-{
-    for (int row = 0; row < 5; row++) {
-        // f32 mod_pos_y = 0;
-        f32 mod_opacity = 1.0;
-        for (int col = 0; col < 8; col++) {
-            int slot_num = (row * 8) + col;
-            position_t *pos = &icons_positions[slot_num];
-            pos->opacity = mod_opacity;
+__attribute_used__ void update_icon_positions() {
+    f32 mult = 0.7; // 1.0 is more accurate
+    selected_icon_mod.rot_diff_x = fast_cos(anim_step * 70) * 350 * mult;
+    selected_icon_mod.rot_diff_y = fast_cos(anim_step * 35 - 15000) * 1000 * mult;
+    selected_icon_mod.rot_diff_z = fast_cos(anim_step * 35) * 1000 * mult;
 
-            f32 sc = 1.3;
-            if (slot_num == selected_slot) {
-                sc = 2.0;
-            }
-            pos->scale = sc;
-
-            f32 pos_x = base_x + (col * 56);
-#if defined(WITH_SPACE) && WITH_SPACE
-            if (slot_num % 8 >= 4) pos_x += 24; // card spacing
-#endif
-            f32 pos_y = base_y - (row * 56);
-
-            C_MTXIdentity(pos->m);
-
-            if (slot_num == selected_slot) {
-                f32 mult = 0.7; // 1.0 is more accurate
-                s32 rot_diff_x = fast_cos(anim_step * 70) * 350 * mult;
-                s32 rot_diff_y = fast_cos(anim_step * 35 - 15000) * 1000 * mult;
-                s32 rot_diff_z = fast_cos(anim_step * 35) * 1000 * mult;
-
-                apply_save_rot(rot_diff_x, rot_diff_y, rot_diff_z, pos->m);
-
-                f32 move_diff_y = fast_sin(35 * anim_step - 0x4000) * 10.0 * mult;
-                f32 move_diff_z = fast_sin(70 * anim_step) * 5.0 * mult;
-
-                pos->m[0][3] = pos_x + move_diff_y;
-                pos->m[1][3] = pos_y - move_diff_z;
-                pos->m[2][3] = 2.0;
-            } else {
-                pos->m[0][3] = pos_x;
-                pos->m[1][3] = pos_y;
-                pos->m[2][3] = 1.0;
-            }
-        }
-    }
+    selected_icon_mod.move_diff_y = fast_sin(35 * anim_step - 0x4000) * 10.0 * mult;
+    selected_icon_mod.move_diff_z = fast_sin(70 * anim_step) * 5.0 * mult;
 
     anim_step += 0x7; // why is this the const?
 }
-#endif
+
 
 __attribute_data__ Mtx global_gameselect_matrix;
 __attribute_data__ Mtx global_gameselect_inverse;
@@ -449,41 +426,49 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     draw_text("cubeboot loader", 20, 20, 4, &white);
 
     // icons
-    for (int line_num = 0; line_num < number_of_lines; line_num++) {
-        line_backing_t *line_backing = &browser_lines[line_num];
+    for (int pass = 0; pass < 2; pass++) {
+        for (int line_num = 0; line_num < number_of_lines; line_num++) {
+            line_backing_t *line_backing = &browser_lines[line_num];
 
-        if (line_backing->raw_position_y >= 0 && line_backing->raw_position_y < SCREEN_BOUND_TOTAL_Y) {
-            f32 real_position_y = SCREEN_BOUND_TOP - line_backing->raw_position_y;
-            // OSReport("line %d: %f\n", line_num, real_position_y);
-            for (int col = 0; col < 8; col++) {
-                int slot_num = (line_num * 8) + col;
+            if (line_backing->raw_position_y >= 0 && line_backing->raw_position_y < SCREEN_BOUND_TOTAL_Y) {
+                f32 real_position_y = SCREEN_BOUND_TOP - line_backing->raw_position_y;
+                // OSReport("line %d: %f\n", line_num, real_position_y);
+                for (int col = 0; col < 8; col++) {
+                    int slot_num = (line_num * 8) + col;
 
-                bool has_texture = (slot_num < asset_count);
-                bool selected = (slot_num == selected_slot);
+                    bool has_texture = (slot_num < asset_count);
+                    bool selected = (slot_num == selected_slot);
 
-                position_t *pos = &icons_positions[col];
-                pos->opacity = line_backing->transparency;
-                pos->m[1][3] = real_position_y;
-                draw_save_icon(pos, slot_num, alpha_1, selected, has_texture);
+                    if (selected && pass == 0) continue; // skip selected icon on first pass
+                    if (!selected && pass == 1) continue; // skip unselected icons on second pass
+
+                    position_t *pos = &icons_positions[col];
+                    f32 saved_x = pos->m[0][3];
+
+                    // modify
+                    pos->opacity = line_backing->transparency;
+                    if (selected) {
+                        pos->scale = 2.0;
+
+                        apply_save_rot(selected_icon_mod.rot_diff_x, selected_icon_mod.rot_diff_y, selected_icon_mod.rot_diff_z, pos->m);
+
+                        pos->m[0][3] = saved_x + selected_icon_mod.move_diff_y;
+                        pos->m[1][3] = real_position_y - selected_icon_mod.move_diff_z;
+                        pos->m[2][3] = 2.0;
+                    } else {
+                        pos->scale = 1.3;
+                        pos->m[1][3] = real_position_y;
+                    }
+                    draw_save_icon(pos, slot_num, alpha_1, selected, has_texture);
+
+                    C_MTXIdentity(pos->m);
+                    pos->m[0][3] = saved_x; // reset x
+                    pos->m[1][3] = 0.0; // reset y
+                    pos->m[2][3] = 1.0; // reset z
+                }
             }
         }
     }
-
-
-    // for (int pass = 0; pass < 2; pass++) {
-    //     for (int row = 0; row < 4; row++) {
-    //         for (int col = 0; col < 8; col++) {
-    //             int slot_num = (row * 8) + col;
-
-    //             bool has_texture = (slot_num < asset_count);
-    //             bool selected = (slot_num == selected_slot);
-
-    //             if (selected && pass == 0) continue; // skip selected icon on first pass
-    //             if (!selected && pass == 1) continue; // skip unselected icons on second pass
-    //             draw_save_icon(slot_num, alpha_1, selected, has_texture);
-    //         }
-    //     }
-    // }
 
     // arrows
     fix_gameselect_view();
@@ -570,9 +555,8 @@ __attribute_used__ void mod_gameselect_draw(u8 alpha_0, u8 alpha_1, u8 alpha_2) 
     return;
 }
 
-__attribute_data__ s32 top_line_num = 0;
 __attribute_used__ s32 handle_gameselect_inputs() {
-    // update_icon_positions();
+    update_icon_positions();
     grid_update_icon_positions();
 
     // TODO: only works with numbers that do not divide into 255
@@ -679,13 +663,24 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         }
 
         if (pad_status->analog_down & ANALOG_UP) {
-            if (selected_slot < 8) {
+            if (top_line_num == 0 && (selected_slot - 8) < 0) {
+                OSReport("SKIP MOVE UP: top_line_num = %d\n", top_line_num);
                 Jac_PlaySe(SOUND_CARD_ERROR);
-            }
-            else {
+            } else {
                 Jac_PlaySe(SOUND_CARD_MOVE);
-                selected_slot -= 8;
+                line_backing_t *line_backing = &browser_lines[selected_slot / 8];
+                if (line_backing->raw_position_y <= DRAW_BOUND_TOP + 56) {
+                    if (grid_dispatch_navigate_up() == 0) {
+                        selected_slot -= 8;
+                        top_line_num--;
+                    }
+                } else {
+                    selected_slot -= 8;
+                }
             }
+            
+            OSReport("top_line_num = %d\n", top_line_num);
+            OSReport("selected_slot = %d\n", selected_slot);
         }
     }
 

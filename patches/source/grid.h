@@ -33,5 +33,6 @@ extern int number_of_lines;
 extern line_backing_t browser_lines[128];
 
 void grid_setup_func();
+int grid_dispatch_navigate_up();
 int grid_dispatch_navigate_down();
 void grid_update_icon_positions();

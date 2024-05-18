@@ -12,6 +12,7 @@ const int xfbHeight = 448;
 // ===============================================================================
 
 #define MAX_ANIMS 100000
+#define START_LINE 10
 #define ANIM_DIRECTION_UP 0
 #define ANIM_DIRECTION_DOWN 1
 
@@ -21,6 +22,8 @@ line_backing_t browser_lines[128];
 // ===============================================================================
 
 // other vars
+extern int selected_slot;
+extern s32 top_line_num;
 
 const int raw_y_top = 64;
 const int base_y = 118;
@@ -49,11 +52,14 @@ void grid_setup_func() {
  
         int row = line_num;
         f32 raw_pos_y = (row * offset_y);
-        line_backing->raw_position_y = DRAW_BOUND_TOP + raw_pos_y;
+        line_backing->raw_position_y = DRAW_BOUND_TOP - (offset_y * START_LINE) + raw_pos_y;
         line_backing->transparency = 1.0;
-        if (line_num >= DRAW_TOTAL_ROWS) {
+        if (line_num < START_LINE || line_num >= START_LINE + DRAW_TOTAL_ROWS) {
             line_backing->transparency = 0.0;
         }
+
+        selected_slot = START_LINE * 8;
+        top_line_num = START_LINE;
 
         anim_list_t *anims = &line_backing->anims;
         anims->pending_count = 0;
@@ -84,6 +90,79 @@ void grid_add_anim(int line_num, int direction, f32 distance) {
 }
 
 
+int grid_dispatch_navigate_up() {
+    OSReport("Up pressed %d\n", number_of_lines);
+
+    // check all anims full or empty
+    // calculate final pos after all pending anims would complete
+    // if final pos is within bounds, add anims
+
+    // int count_visible_after = 0;
+    // int max_pending = 0;
+    // for (int line_num = 0; line_num < number_of_lines; line_num++) {
+    //     line_backing_t *line_backing = &browser_lines[line_num];
+    //     anim_list_t *anims = &line_backing->anims;
+    //     if (anims->pending_count > max_pending) {
+    //         max_pending = anims->pending_count;
+    //     }
+
+    //     // no idea why this works
+    //     if (get_position_after(line_backing) + 10 >= DRAW_BOUND_TOP && get_position_after(line_backing) - 10 < DRAW_BOUND_BOTTOM) {
+    //         count_visible_after++;
+    //     }
+    // }
+
+    // if (max_pending == MAX_ANIMS) {
+    //     OSReport("ERROR: Max anims exceeded\n");
+    //     return 1;
+    // }
+
+    // if (count_visible_after <= 4) {
+    //     OSReport("ERROR: All visible (count_visible_after=%d)\n", count_visible_after);
+    //     return 1;
+    // }
+
+    bool found_move_in = false;
+    bool found_move_out = false;
+    for (int line_num = 0; line_num < number_of_lines; line_num++) {
+        line_backing_t *line_backing = &browser_lines[line_num];
+        anim_list_t *anims = &line_backing->anims;
+
+        f32 partial_position_y = get_position_after(line_backing);
+        if (!found_move_in && partial_position_y + offset_y + 10 >= DRAW_BOUND_TOP && partial_position_y - 10 < DRAW_BOUND_TOP) {
+            // OSReport("ERROR: End position is out of bounds (%d)\n", line_num);
+            f32 anim_distance = offset_y * 0.5;
+            line_backing->raw_position_y = DRAW_BOUND_TOP - anim_distance;
+            line_backing->transparency = 0.25;
+            line_backing->moving_in = true;
+            line_backing->moving_out = false;
+
+            found_move_in = true;
+            OSReport("Moving in %d\n", line_num);
+            grid_add_anim(line_num, ANIM_DIRECTION_DOWN, anim_distance);
+        } else if (partial_position_y < (DRAW_BOUND_BOTTOM + offset_y - 10) && partial_position_y >= (DRAW_BOUND_TOP - offset_y + 10)) {
+            grid_add_anim(line_num, ANIM_DIRECTION_DOWN, offset_y);
+            // OSReport("Adding anim %d, current=%f sub=%f\n", line_num, position_y, offset_y);
+        } else {
+            line_backing->raw_position_y += offset_y;
+        }
+
+        f32 end_position_y = get_position_after(line_backing);
+        if (!found_move_out && end_position_y + 10 >= DRAW_BOUND_BOTTOM && end_position_y - offset_y < DRAW_BOUND_BOTTOM) {
+            line_backing->transparency = 0.999;
+            line_backing->moving_out = true;
+            line_backing->moving_in = false;
+
+            found_move_out = true;
+            OSReport("Moving out %d\n", line_num);
+            // OSReport("Current position = %f\n", position_y);
+            // OSReport("End position = %f\n", end_position_y);
+        }
+    }
+
+    return 0;
+}
+
 int grid_dispatch_navigate_down() {
     OSReport("Down pressed %d\n", number_of_lines);
 
@@ -91,30 +170,30 @@ int grid_dispatch_navigate_down() {
     // calculate final pos after all pending anims would complete
     // if final pos is within bounds, add anims
 
-    int count_visible_after = 0;
-    int max_pending = 0;
-    for (int line_num = 0; line_num < number_of_lines; line_num++) {
-        line_backing_t *line_backing = &browser_lines[line_num];
-        anim_list_t *anims = &line_backing->anims;
-        if (anims->pending_count > max_pending) {
-            max_pending = anims->pending_count;
-        }
+    // int count_visible_after = 0;
+    // int max_pending = 0;
+    // for (int line_num = 0; line_num < number_of_lines; line_num++) {
+    //     line_backing_t *line_backing = &browser_lines[line_num];
+    //     anim_list_t *anims = &line_backing->anims;
+    //     if (anims->pending_count > max_pending) {
+    //         max_pending = anims->pending_count;
+    //     }
 
-        // no idea why this works
-        if (get_position_after(line_backing) + 10 >= DRAW_BOUND_TOP && get_position_after(line_backing) - 10 < DRAW_BOUND_BOTTOM) {
-            count_visible_after++;
-        }
-    }
+    //     // no idea why this works
+    //     if (get_position_after(line_backing) + 10 >= DRAW_BOUND_TOP && get_position_after(line_backing) - 10 < DRAW_BOUND_BOTTOM) {
+    //         count_visible_after++;
+    //     }
+    // }
 
-    if (max_pending == MAX_ANIMS) {
-        OSReport("ERROR: Max anims exceeded\n");
-        return 1;
-    }
+    // if (max_pending == MAX_ANIMS) {
+    //     OSReport("ERROR: Max anims exceeded\n");
+    //     return 1;
+    // }
 
-    if (count_visible_after <= 4) {
-        OSReport("ERROR: All visible (count_visible_after=%d)\n", count_visible_after);
-        return 1;
-    }
+    // if (count_visible_after <= 4) {
+    //     OSReport("ERROR: All visible (count_visible_after=%d)\n", count_visible_after);
+    //     return 1;
+    // }
 
     bool found_move_in = false;
     bool found_move_out = false;
@@ -196,14 +275,14 @@ void grid_update_icon_positions() {
         line_backing_t *line_backing = &browser_lines[line_num];
         anim_list_t *anims = &line_backing->anims;
 
-        f32 multiplier = 3 * 3;
+        f32 multiplier = 3 * 2;
         // if (anims->pending_count) {
         //     multiplier += anims->pending_count;
         //     if (multiplier > 8) multiplier = 8;
         // }
 
         // transparency
-        if (line_backing->transparency < 1.0 && anims->direction == ANIM_DIRECTION_UP) {
+        if (line_backing->transparency < 1.0) {
             f32 delta = 0.01 * multiplier;
             if (line_backing->moving_in) {
                 line_backing->transparency += (delta * 0.4);
