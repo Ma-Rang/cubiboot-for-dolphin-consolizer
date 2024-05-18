@@ -21,7 +21,8 @@ typedef struct {
 	u8 	StreamBufSize;	//For the AudioEnable. (always 00?)
 	u8	unused_1[18];	
 	u32 DVDMagicWord;	//0xC2339F3D
-	char GameName[992];	//String Name of Game, rarely > 32 chars
+	char GameName[64];	//String Name of Game, rarely > 32 chars
+	u8 Padding[928];
 	u32 DMonitorOffset;	//offset of debug monitor (dh.bin)?
 	u32	DMonitorLoadAd;	//addr(?) to load debug monitor?
 	u8	unused_2[24];	

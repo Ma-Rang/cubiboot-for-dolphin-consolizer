@@ -48,10 +48,6 @@ typedef struct {
     char path[128];
 } game_asset;
 
-// __attribute__((aligned(32))) static BNR global_banner_buf;
-// __attribute__((aligned(32))) static u8 global_png_buf[24 * 1024];
-// __attribute__((aligned(32))) game_asset assets[32] = {};
-
 static u32 prog_entrypoint, prog_dst, prog_src, prog_len;
 
 #define BS2_BASE_ADDR 0x81300000
@@ -71,12 +67,12 @@ void *xfb;
 GXRModeObj *rmode;
 
 void __SYS_PreInit() {
-    if (state->boot_code == 0xCAFEBEEF) return;
+    // if (state->boot_code == 0xCAFEBEEF) return;
 
     SYS_SetArenaHi((void*)BS2_BASE_ADDR);
 
-    current_dol_len = &_edata - &_start;
-    memcpy(current_dol_buf, &_start, current_dol_len);
+    // current_dol_len = &_edata - &_start;
+    // memcpy(current_dol_buf, &_start, current_dol_len);
 }
 
 int main() {
@@ -209,6 +205,7 @@ int main() {
     }
 #endif
 
+#if 0
     iprintf("Checkup, done=%08x\n", state->boot_code);
     if (state->boot_code == 0xCAFEBEEF) {
         iprintf("He's alive! The doc's alive! He's in the old west, but he's alive!!\n");
@@ -260,6 +257,7 @@ int main() {
             boot_program(NULL);
         }
     }
+#endif
 
 //// fun stuff
 
@@ -411,12 +409,6 @@ int main() {
 
     set_patch_value(symshdr, syment, symstringdata, "preboot_delay_ms", settings.preboot_delay_ms);
     set_patch_value(symshdr, syment, symstringdata, "postboot_delay_ms", settings.postboot_delay_ms);
-
-    // // Copy custom icons into place
-    // set_patch_value(symshdr, syment, symstringdata, "assets", (u32)assets);
-    // set_patch_value(symshdr, syment, symstringdata, "asset_count", current_asset_index);
-
-    // while(1);
 
     unmount_current_device();
 

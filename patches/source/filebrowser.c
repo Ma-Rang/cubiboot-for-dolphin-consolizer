@@ -13,6 +13,7 @@
 #include "dolphin_arq.h"
 
 #include "grid.h"
+#include "filebrowser.h"
 
 #include "../../cubeboot/include/bnr.h"
 
@@ -31,7 +32,7 @@ typedef struct {
     u32 dvd_bnr_offset;
     u32 mem_bnr_offset;
     u32 aram_bnr_offset;
-    char iso_name[64];
+    char disc_name[64];
     char iso_path[128];
     ARQRequest aram_req;
 } game_backing_entry_t;
@@ -42,9 +43,14 @@ int cmp_iso_path(const void* ptr_a, const void* ptr_b){
     return strcmp(obj_a->iso_path, obj_b->iso_path);
 }
 
-int game_backing_count;
+int game_backing_count = 0;
 game_backing_entry_t raw_game_backing_list[1000];
+game_backing_entry_t *sorted_raw_game_backing_list[1000];
 game_backing_entry_t *game_backing_list[1000];
+
+// bnr buffers for each game
+
+static game_asset_t (*game_assets)[384] = (void*)0x80400000; // needs 3mb usable
 
 // draw variables
 int number_of_lines = 0;
@@ -98,6 +104,7 @@ void __DVDFSInit_threaded(game_backing_entry_t *backing) {
     for (u32 i = 1; i < total_entries; ++i) { //Start @ 1 to skip FST header
         u32 string_offset = GET_OFFSET(p[i].offset);
         char *string = (char*)((u32)string_table + string_offset);
+        OSReport("FST (0x%08x) entry: %s\n", FILE_POSITION(i), string);
         if (entry_table[i].filetype == T_FILE && strcmp(string, "opening.bnr") == 0) {
             OSReport("FST (0x%08x) entry: %s\n", FILE_POSITION(i), string);
             backing->dvd_bnr_offset = FILE_POSITION(i);
@@ -105,6 +112,41 @@ void __DVDFSInit_threaded(game_backing_entry_t *backing) {
         }
     }
     OSYieldThread();
+}
+
+// a function that will allocate a new entry in the asset list
+game_asset_t *claim_game_asset() {
+    for (int i = 0; i < 384; i++) {
+        game_asset_t *asset = &(*game_assets)[i];
+        if (!asset->in_use) {
+            asset->in_use = 1;
+            return asset;
+        }
+    }
+    return NULL;
+}
+
+// a function that will free an entry in the asset list
+void free_game_asset(int backing_index) {
+    game_asset_t *asset = get_game_asset(backing_index);
+    if (asset != NULL) {
+        asset->in_use = 0;
+    }
+}
+
+// a function that will get the current asset based on the backing index
+game_asset_t *get_game_asset(int backing_index) {
+    for (int i = 0; i < 384; i++) {
+        game_asset_t *asset = &(*game_assets)[i];
+        if (asset->backing_index == backing_index) {
+            return asset;
+        }
+    }
+    return NULL;
+}
+
+const char *get_game_path(int backing_index) {
+    return game_backing_list[backing_index]->iso_path;
 }
 
 static int early_file_enum() {
@@ -143,26 +185,25 @@ static int early_file_enum() {
         game_backing_entry_t *game_backing = &raw_game_backing_list[current_ent_index];
         strcpy(game_backing->iso_path, SD_TARGET_PATH);
         strcat(game_backing->iso_path, ent.name);
-        game_backing->iso_name[0] = '\0'; // zero name string
+        game_backing->disc_name[0] = '\0'; // zero name string
 
         // ret = dvd_custom_open(IPC_DEVICE_SD, game_backing->iso_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
         // OSReport("OPEN ret: %d\n", ret);
 
-        game_backing_list[current_ent_index] = game_backing;
+        sorted_raw_game_backing_list[current_ent_index] = game_backing;
         current_ent_index++;
     }
-    game_backing_count = current_ent_index;
 
     f32 runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;
     OSReport("File enum completed! took=%f (%d)\n", runtime, game_backing_count);
 
     start_time = gettime();
-    qsort(game_backing_list, game_backing_count, sizeof(game_backing_entry_t*), &cmp_iso_path);
+    qsort(sorted_raw_game_backing_list, current_ent_index, sizeof(game_backing_entry_t*), &cmp_iso_path);
 
     runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;
     OSReport("Sort took=%f\n", runtime);
 
-    return game_backing_count;
+    return current_ent_index;
 }
 
 void *file_enum_worker(void* param) {
@@ -171,15 +212,18 @@ void *file_enum_worker(void* param) {
     number_of_lines = (number_of_entries + 7) >> 3;
     OSReport("Current lines = %d\n", number_of_lines);
 
+    memset((void*)0x80400000, 0, 0x300000); // clear assets
+
     // test only
     number_of_lines = 20;
     grid_setup_func();
 
     OSReport("SECOND File enum:\n");
     u64 start_time = gettime();
-    for (int i = 0; i < game_backing_count; i++) {
+    int current_ent_index = 0;
+    for (int i = 0; i < number_of_entries; i++) {
         OSReport("game backing: %d\n", i);
-        game_backing_entry_t *game_backing = game_backing_list[i];
+        game_backing_entry_t *game_backing = sorted_raw_game_backing_list[i];
         int ret = dvd_threaded_custom_open(IPC_DEVICE_SD, game_backing->iso_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
         if (ret != 0) {
             weird_panic();
@@ -199,6 +243,8 @@ void *file_enum_worker(void* param) {
             game_backing->is_gcm = true;
         }
 
+        strncpy(game_backing->disc_name, header.GameName, 64);
+
         char game_id[8];
         memcpy(game_id, &header, 6);
         game_id[6] = '\x00';
@@ -210,13 +256,52 @@ void *file_enum_worker(void* param) {
 
         OSReport("FSTSize = 0x%08x\n", game_backing->fst_size);
         __DVDFSInit_threaded(game_backing);
+        if (game_backing->dvd_bnr_offset == 0) {
+            OSReport("No opening.bnr found, skipping\n");
+            continue;
+        }
 
         OSReport("Reading opening.bnr\n");
-        dvd_threaded_read(&game_loading_banner, sizeof(BNR), game_backing->dvd_bnr_offset); //Read banner file
+        BNR *banner_buffer = &game_loading_banner;
+        if (current_ent_index < 384) {
+            game_asset_t *asset = &(*game_assets)[current_ent_index];
+            OSReport("Claiming asset %d (@%p)\n", current_ent_index, asset);
+            asset->backing_index = current_ent_index;
+            asset->in_use = 1;
+
+            banner_buffer = (void*)&asset->banner;
+        }
+
+        dvd_threaded_read(banner_buffer, sizeof(BNR), game_backing->dvd_bnr_offset); //Read banner file
         OSYieldThread();
 
+        // print the 4 bytes of the magic
+        OSReport("BNR magic: %c%c%c%c\n", banner_buffer->magic[0], banner_buffer->magic[1], banner_buffer->magic[2], banner_buffer->magic[3]);
+
+        // u32 bnr_magic = *(u32*)banner_buffer->magic[0];
+        // if (bnr_magic != 0x424e5231 && bnr_magic != 0x424e5232) {
+        //     OSReport("Invalid banner magic, skipping\n");
+        //     continue;
+        // }
+
+        if (banner_buffer->desc[0].fullGameName[0] == 0) {
+            strncpy(banner_buffer->desc[0].fullGameName, game_backing->disc_name, 63);
+            banner_buffer->desc[0].fullGameName[63] = '\0';
+        }
+
+        if (banner_buffer->desc[0].description[0] == 0) {
+            strncpy(banner_buffer->desc[0].description, game_backing->iso_path, 127);
+            banner_buffer->desc[0].description[127] = '\0';
+        }
+
         OSReport("Copying banner to ARAM\n");
-        aram_copy(&game_loading_banner, 0x0200000 + (i * sizeof(BNR)), sizeof(BNR));
+        aram_copy(&game_backing->aram_req, banner_buffer, 0x0200000 + (i * sizeof(BNR)), sizeof(BNR));
+
+        // register game backing
+        game_backing_list[current_ent_index] = game_backing;
+
+        current_ent_index++;
+        game_backing_count = current_ent_index; // make entry active
     }
 
     f32 runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;

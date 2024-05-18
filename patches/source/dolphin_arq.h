@@ -24,4 +24,4 @@ typedef struct ARQRequest {
     ARQCallback callback;
 } ARQRequest;
 
-void aram_copy(void *src, u32 dst, u32 size);
+void aram_copy(ARQRequest *task, void *src, u32 dst, u32 size);

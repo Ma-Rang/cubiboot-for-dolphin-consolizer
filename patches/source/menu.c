@@ -76,16 +76,6 @@ __attribute_reloc__ u32 *bs2start_ready;
 __attribute_reloc__ u32 *banner_pointer;
 __attribute_reloc__ u32 *banner_ready;
 
-// test only
-typedef struct {
-    struct gcm_disk_header header;
-    BNR banner;
-    // u8 icon_rgb5[64*64*2];
-    char path[128];
-} game_asset;
-
-game_asset *assets;
-__attribute_data__ int asset_count; // unused
 __attribute_data__ char boot_path[128];
 
 typedef struct {
@@ -106,9 +96,6 @@ typedef struct {
 } selected_mod_t;
 
 static selected_mod_t selected_icon_mod;
-
-
-// static asset_t (*game_assets)[40] = 0x80400000; // needs ~2.5mb
 
 // Define constants for max dimensions
 void setup_icon_positions();
@@ -268,6 +255,9 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
     f32 sc = pos->scale;
     guVector scale = {sc, sc, sc};
 
+    game_asset_t *asset = get_game_asset(slot_num);
+    if (asset == NULL) has_texture = false;
+
     model *m = NULL;
     if (has_texture) {
         m = textured_icon;
@@ -300,7 +290,8 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
         // icon
         tex_data *icon_tex = &m->data->tex->dat[1];
         // u32 target_texture_data = (u32)assets[index].icon_rgb5;
-        u16 *source_texture_data = (u16*)assets[0].banner.pixelData;
+        // u16 *source_texture_data = (u16*)assets[0].banner.pixelData;
+        u16 *source_texture_data = (u16*)asset->banner.pixelData;
         u32 target_texture_data = (u32)source_texture_data;
 
         s32 desired_offset = (s32)((u32)target_texture_data - (u32)icon_tex);
@@ -370,7 +361,6 @@ void setup_icon_positions() {
 #else
     const int base_x = -196;
 #endif
-    const int base_y = 118;
 
     for (int col = 0; col < 8; col++) {
         position_t *pos = &icons_positions[col];
@@ -481,10 +471,11 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     if (rmode->viTVMode >> 2 == VI_NTSC) // quirk
         draw_info_box(&white);
 
-    if (selected_slot < asset_count) {
+    game_asset_t *asset = get_game_asset(selected_slot);
+    if (asset != NULL && selected_slot < game_backing_count) {
         // info
-        draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, assets[selected_slot].banner.desc->fullGameName, 0x1f);
-        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, assets[selected_slot].banner.desc->description, 0x1f);
+        draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, asset->banner.desc->fullGameName, 0x1f);
+        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, asset->banner.desc->description, 0x1f);
 
         // game source
         draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
@@ -492,7 +483,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
 
         // banner image
         setup_tex_draw(1, 0, 1);
-        banner_texture.offset = (s32)((u32)(assets[selected_slot].banner.pixelData) - (u32)&banner_texture);
+        banner_texture.offset = (s32)((u32)(asset->banner.pixelData) - (u32)&banner_texture);
         draw_blob_tex(make_type('b','a','n','a'), menu_blob, &white, &banner_texture);
     }
 
@@ -534,8 +525,6 @@ __attribute_used__ void pre_menu_alpha_setup() {
             Jac_PlaySe(SOUND_MENU_ENTER);
             first_transition = false;
         }
-
-        memset((void*)0x80400000, 0, 0x200000); // clear assets
     }
 }
 
@@ -562,7 +551,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     update_icon_positions();
     grid_update_icon_positions();
 
-    // TODO: only works with numbers that do not divide into 255
+    // TODO: only works with numbers that do not divide into 255 (switch to floats?)
     const u8 transition_step = 14;
     if (in_submenu_transition) {
         if (custom_menu_transition_alpha != 0 && original_menu_transition_alpha != 0) {
@@ -608,11 +597,14 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_A && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
-        if (selected_slot < asset_count && !in_submenu_transition) {
+        if (selected_slot < game_backing_count && !in_submenu_transition) {
             in_submenu_transition = true;
             current_gameselect_state = SUBMENU_GAMESELECT_START;
-            *banner_pointer = (u32)&assets[selected_slot].banner; // banner buf
-
+            game_asset_t *asset = get_game_asset(selected_slot);
+            if (asset != NULL) {
+                *banner_pointer = (u32)&asset->banner; // banner buf
+            }
+    
             Jac_PlaySe(SOUND_SUBMENU_ENTER);
             setup_gameselect_anim();
             setup_cube_anim();
@@ -622,7 +614,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();
         Jac_PlaySe(SOUND_MENU_FINAL);
-        strcpy(boot_path, assets[selected_slot].path);
+        strcpy(boot_path, get_game_path(selected_slot));
         *bs2start_ready = 1;
     }
 
@@ -654,7 +646,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
             } else {
                 Jac_PlaySe(SOUND_CARD_MOVE);
                 line_backing_t *line_backing = &browser_lines[selected_slot / 8];
-                if (line_backing->raw_position_y >= DRAW_BOUND_BOTTOM - 56) {
+                if (get_position_after(line_backing) >= DRAW_BOUND_BOTTOM - 56) {
                     if (grid_dispatch_navigate_down() == 0) {
                         selected_slot += 8;
                         top_line_num++;
@@ -669,10 +661,10 @@ __attribute_used__ s32 handle_gameselect_inputs() {
             if (top_line_num == 0 && (selected_slot - 8) < 0) {
                 OSReport("SKIP MOVE UP: top_line_num = %d\n", top_line_num);
                 Jac_PlaySe(SOUND_CARD_ERROR);
-            } else if (top_line_num != 0) {
+            } else {
                 Jac_PlaySe(SOUND_CARD_MOVE);
                 line_backing_t *line_backing = &browser_lines[selected_slot / 8];
-                if (get_position_after(line_backing) <= DRAW_BOUND_TOP + 56) {
+                if (top_line_num != 0 && get_position_after(line_backing) <= DRAW_BOUND_TOP + 56 - 10) {
                     if (grid_dispatch_navigate_up() == 0) {
                         selected_slot -= 8;
                         top_line_num--;

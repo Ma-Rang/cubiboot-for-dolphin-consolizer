@@ -12,7 +12,7 @@ const int xfbHeight = 448;
 // ===============================================================================
 
 #define MAX_ANIMS 100000
-#define START_LINE 10
+#define START_LINE 0
 #define ANIM_DIRECTION_UP 0
 #define ANIM_DIRECTION_DOWN 1
 
@@ -116,7 +116,7 @@ int grid_dispatch_navigate_up() {
     bool found_move_out = false;
     for (int line_num = 0; line_num < number_of_lines; line_num++) {
         line_backing_t *line_backing = &browser_lines[line_num];
-        anim_list_t *anims = &line_backing->anims;
+        // anim_list_t *anims = &line_backing->anims;
 
         f32 partial_position_y = get_position_after(line_backing);
         if (!found_move_in && partial_position_y + offset_y + 10 >= DRAW_BOUND_TOP && partial_position_y - 10 < DRAW_BOUND_TOP) {
@@ -183,7 +183,7 @@ int grid_dispatch_navigate_down() {
     bool found_move_out = false;
     for (int line_num = 0; line_num < number_of_lines; line_num++) {
         line_backing_t *line_backing = &browser_lines[line_num];
-        anim_list_t *anims = &line_backing->anims;
+        // anim_list_t *anims = &line_backing->anims;
 
         f32 partial_position_y = get_position_after(line_backing);
         if (!found_move_in && partial_position_y + 10 >= DRAW_BOUND_BOTTOM && partial_position_y - offset_y - 10 < DRAW_BOUND_BOTTOM) {
