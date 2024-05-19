@@ -68,3 +68,5 @@ ntsc10_uart_init = 0x8145dca8;
 
 ntsc10_save_icon = 0x8147a280;
 ntsc10_save_empty = 0x8147a248;
+
+ntsc10_orig_thread_init = 0x8131b4ec;

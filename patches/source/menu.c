@@ -461,9 +461,9 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
         }
     }
 
-    // // arrows
-    // fix_gameselect_view();
-    // setup_tex_draw(1, 0, 0);
+    // arrows
+    fix_gameselect_view();
+    setup_tex_draw(1, 0, 0);
     // void (*draw_named_tex)(u32 type, void *blob, GXColor *color, s16 x, s16 y) = (void*)0x8130a36c;
     // draw_named_tex(make_type('a','r','a','d'), menu_blob, &white, 0x800 - 100, 0); // TODO: y pos
 

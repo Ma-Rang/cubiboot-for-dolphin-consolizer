@@ -63,3 +63,5 @@ pal12_cur_menu_id = 0x814af6ec;
 pal12_prev_menu_id = 0x814af6f0;
 pal12_save_empty = 0x814cc128;
 pal12_save_icon = 0x814cc160;
+
+pal12_orig_thread_init = 0x8131c704;

@@ -63,3 +63,5 @@ pal11_cur_menu_id = 0x8147c214;
 pal11_prev_menu_id = 0x8147c218;
 pal11_save_empty = 0x81499728;
 pal11_save_icon = 0x81499760;
+
+pal11_orig_thread_init = 0x8131bb44;

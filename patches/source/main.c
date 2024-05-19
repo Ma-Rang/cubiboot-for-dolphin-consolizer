@@ -56,6 +56,7 @@ __attribute_reloc__ void (*__OSStopAudioSystem)();
 __attribute_reloc__ void (*run)(register void* entry_point, register u32 clear_start, register u32 clear_size);
 
 // for setup
+__attribute_reloc__ void (*orig_thread_init)();
 __attribute_reloc__ void (*menu_init)();
 __attribute_reloc__ void (*main)();
 
@@ -248,8 +249,7 @@ __attribute_used__ void mod_cube_anim() {
 }
 
 __attribute_used__ void pre_thread_init() {
-    void (*thread_init)() = (void*)0x8131bc18;
-    thread_init();
+    orig_thread_init();
     start_file_enum();
 }
 

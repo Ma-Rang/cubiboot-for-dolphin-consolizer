@@ -65,3 +65,5 @@ pal10_banner_pointer = 0x814ad2f0;
 pal10_game_blob_text = 0x814de4c8;
 pal10_prev_menu_id = 0x814ad3f8;
 pal10_save_empty = 0x814ca968;
+
+pal10_orig_thread_init = 0x8131c5c4;

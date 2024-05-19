@@ -63,3 +63,5 @@ ntsc12_101_cur_menu_id = 0x81483aac;
 ntsc12_101_prev_menu_id = 0x81483ab0;
 ntsc12_101_save_empty = 0x814a04e8;
 ntsc12_101_save_icon = 0x814a0520;
+
+ntsc12_101_orig_thread_init = 0x8131bfc8;

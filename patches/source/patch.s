@@ -7,11 +7,15 @@
 // patch_inst vNTSC_11(_test_only_b) 0x81336124 b _addr_81336124
 // patch_inst vNTSC_11(_skip_menu_logo) 0x8130d178 li r3, 5
 // patch_inst vNTSC_11(_reduce_heap_size) 0x81307df4 lis r5, -0x7f00 // 0x81100000 -> 0x81000000
-patch_inst vNTSC_11(_reduce_arena_size) 0x8135825c lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
-patch_inst vNTSC_11(_patch_thread_init) 0x81301070 bl pre_thread_init
 
 // patch_inst vNTSC_11(_force_english_lang) 0x8130b73c li r0, 0 // NTSC Only
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
+
+patch_inst_ntsc "_reduce_arena_size" 0x813328ec 0x8135825c 0x8135d998 0x8135d998 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
+patch_inst_pal "_reduce_arena_size" 0x8135b83c 0x8135817c 0x81360d10 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
+
+patch_inst_ntsc "_patch_thread_init" 0x81301234 0x81301070 0x81301424 0x81301428 bl pre_thread_init
+patch_inst_pal "_patch_thread_init" 0x81301070 0x81301070 0x813011dc bl pre_thread_init
 
 patch_inst_ntsc "_draw_watermark" 0x81314898 0x81314bb0 0x81314f48 0x81314f60 bl alpha_watermark
 patch_inst_pal "_draw_watermark" 0x81315630 0x81314adc 0x81315770 bl alpha_watermark
@@ -32,18 +36,6 @@ patch_inst_pal "_gameselect_replace_input" 0x81327968 0x81326ec0 0x81327aa8 bl h
 # NOTE: this is a mid-finction patch
 patch_inst_ntsc "_gameselect_draw_helper" 0x81326c14 0x81327430 0x813277c8 0x813277e0 routine_gameselect_matrix_helper
 patch_inst_pal "_gameselect_draw_helper" 0x81327e04 0x8132735c 0x81327f44 routine_gameselect_matrix_helper
-
-// patch_inst vNTSC_11(_disable_main_menu_text) 0x81314d24 nop
-// patch_inst vNTSC_11(_disable_main_menu_cube_a) 0x8130df44 nop
-// patch_inst vNTSC_11(_disable_main_menu_cube_b) 0x8130dfac nop
-// patch_inst vNTSC_11(_disable_menu_transition_cube) 0x8130de04 nop
-// patch_inst vNTSC_11(_disable_menu_transition_outer) 0x8130ddc0 nop
-
-// patch_inst vNTSC_11(_disable_menu_transition_text_a) 0x8130de88 nop
-// patch_inst vNTSC_11(_disable_menu_transition_text_b) 0x8130de70 nop
-
-// patch_inst vNTSC_11(_disable_options_menu_transition) 0x81327c4c nop
-// patch_inst vNTSC_11(_disable_memory_card_detect) 0x813010ec nop
 
 patch_inst_ntsc "_stub_dvdwait" 0x00000000 0x8130108c 0x81301440 0x81301444 nop
 patch_inst_pal  "_stub_dvdwait" 0x8130108c 0x8130108c 0x813011f8 nop

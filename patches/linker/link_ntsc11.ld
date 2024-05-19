@@ -73,3 +73,5 @@ ntsc11_apply_save_rot = 0x81307510;
 ntsc11_bs2start_ready = 0x814816d8;
 ntsc11_banner_pointer = 0x81481450;
 ntsc11_banner_ready = 0x814813f0;
+
+ntsc11_orig_thread_init = 0x8131bc18;
