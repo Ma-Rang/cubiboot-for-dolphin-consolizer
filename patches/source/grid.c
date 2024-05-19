@@ -23,10 +23,8 @@ line_backing_t browser_lines[128];
 
 // other vars
 extern int selected_slot;
-extern s32 top_line_num;
+extern int top_line_num;
 
-// const int raw_y_top = 64;
-// const int base_y = 118;
 const f32 offset_y = DRAW_OFFSET_Y;
 
 f32 get_position_after(line_backing_t *line_backing) {

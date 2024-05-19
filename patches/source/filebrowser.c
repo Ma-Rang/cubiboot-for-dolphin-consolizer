@@ -294,8 +294,8 @@ void *file_enum_worker(void* param) {
             banner_buffer->desc[0].description[127] = '\0';
         }
 
-        OSReport("Copying banner to ARAM\n");
-        aram_copy(&game_backing->aram_req, banner_buffer, 0x0200000 + (i * sizeof(BNR)), sizeof(BNR));
+        // OSReport("Copying banner to ARAM\n");
+        // aram_copy(&game_backing->aram_req, banner_buffer, 0x0200000 + (i * sizeof(BNR)), sizeof(BNR));
 
         // register game backing
         game_backing_list[current_ent_index] = game_backing;
@@ -316,10 +316,6 @@ void *file_enum_worker(void* param) {
     return NULL;
 }
 
-typedef void* (*OSThreadStartFunction)(void*);
-BOOL (*OSCreateThread)(void *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr) = (void*)0x8135f7d4;
-s32 (*OSResumeThread)(void *thread) = (void*)0x8135fb94;
-
 // match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
 static u8 thread_obj[0x310];
 static u8 thread_stack[32 * 1024];
@@ -328,6 +324,6 @@ void start_file_enum() {
     void *thread_stack_top = thread_stack + thread_stack_size;
     s32 thread_priority = DEFAULT_THREAD_PRIO + 3;
 
-    OSCreateThread(&thread_obj[0], file_enum_worker, 0, thread_stack_top, thread_stack_size, thread_priority, 0);
-    OSResumeThread(&thread_obj[0]);
+    dolphin_OSCreateThread(&thread_obj[0], file_enum_worker, 0, thread_stack_top, thread_stack_size, thread_priority, 0);
+    dolphin_OSResumeThread(&thread_obj[0]);
 }

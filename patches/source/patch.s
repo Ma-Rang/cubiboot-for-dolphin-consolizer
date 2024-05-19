@@ -8,49 +8,19 @@
 // patch_inst vNTSC_11(_skip_menu_logo) 0x8130d178 li r3, 5
 // patch_inst vNTSC_11(_reduce_heap_size) 0x81307df4 lis r5, -0x7f00 // 0x81100000 -> 0x81000000
 patch_inst vNTSC_11(_reduce_arena_size) 0x8135825c lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
-
 patch_inst vNTSC_11(_patch_thread_init) 0x81301070 bl pre_thread_init
-
-// patch_inst vNTSC_11(_trap_dvd_open) 0x81362678 trap
-// patch_inst vNTSC_11(_trap_dvd_fast_open) 0x81362604 trap
-// patch_inst vNTSC_11(_trap_dvd_read_bs2) 0x81364818 trap
-// patch_inst vNTSC_11(_trap_dvd_read_async) 0x8136473c trap
-// patch_inst vNTSC_11(_trap_dvd_read) 0x81362988 trap
-// patch_inst vNTSC_11(_trap_dvd_read_diskid) 0x813648e8 trap
-// patch_inst vNTSC_11(_trap_dvd_fst_path) 0x81362310 trap
-// patch_inst vNTSC_11(_trap_dvd_close) 0x81362740 trap
-// patch_inst vNTSC_11(_trap_dvd_reset) 0x81364cc0 trap
-// patch_inst vNTSC_11(_trap_dvd_audio_config) 0x81364b48 trap
-// patch_inst vNTSC_11(_trap_dvd_prep_stream) 0x81362ac4 trap
-// patch_inst vNTSC_11(_trap_dvd_low_motor) 0x81361d60 trap
-// patch_inst vNTSC_11(_trap_dvd_change_disc) 0x81364c04 trap
 
 // patch_inst vNTSC_11(_force_english_lang) 0x8130b73c li r0, 0 // NTSC Only
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
 
-patch_inst vNTSC_10(_draw_watermark) 0x81314898 bl alpha_watermark
-patch_inst vNTSC_11(_draw_watermark) 0x81314bb0 bl alpha_watermark
-patch_inst vNTSC_12_001(_draw_watermark) 0x81314f48 bl alpha_watermark
-patch_inst vNTSC_12_101(_draw_watermark) 0x81314f60 bl alpha_watermark
-patch_inst vPAL_10(_draw_watermark) 0x81315630 bl alpha_watermark
-patch_inst vPAL_11(_draw_watermark) 0x81314adc bl alpha_watermark
-patch_inst vPAL_12(_draw_watermark) 0x81315770 bl alpha_watermark
+patch_inst_ntsc "_draw_watermark" 0x81314898 0x81314bb0 0x81314f48 0x81314f60 bl alpha_watermark
+patch_inst_pal "_draw_watermark" 0x81315630 0x81314adc 0x81315770 bl alpha_watermark
 
-patch_inst vNTSC_10(_gameselect_replace_draw) 0x81314200 bl mod_gameselect_draw
-patch_inst vNTSC_11(_gameselect_replace_draw) 0x81314518 bl mod_gameselect_draw
-patch_inst vNTSC_12_001(_gameselect_replace_draw) 0x813148b0 bl mod_gameselect_draw
-patch_inst vNTSC_12_101(_gameselect_replace_draw) 0x813148c8 bl mod_gameselect_draw
-patch_inst vPAL_10(_gameselect_replace_draw) 0x81314e58 bl mod_gameselect_draw
-patch_inst vPAL_11(_gameselect_replace_draw) 0x81314444 bl mod_gameselect_draw
-patch_inst vPAL_12(_gameselect_replace_draw) 0x81314f98 bl mod_gameselect_draw
+patch_inst_ntsc "_gameselect_replace_draw" 0x81314200 0x81314518 0x813148b0 0x813148c8 bl mod_gameselect_draw
+patch_inst_pal "_gameselect_replace_draw" 0x81314e58 0x81314444 0x81314f98 bl mod_gameselect_draw
 
-patch_inst vNTSC_10(_gameselect_replace_input) 0x81326818 bl handle_gameselect_inputs
-patch_inst vNTSC_11(_gameselect_replace_input) 0x81326f94 bl handle_gameselect_inputs
-patch_inst vNTSC_12_001(_gameselect_replace_input) 0x8132732c bl handle_gameselect_inputs
-patch_inst vNTSC_12_101(_gameselect_replace_input) 0x81327344 bl handle_gameselect_inputs
-patch_inst vPAL_10(_gameselect_replace_input) 0x81327968 bl handle_gameselect_inputs
-patch_inst vPAL_11(_gameselect_replace_input) 0x81326ec0 bl handle_gameselect_inputs
-patch_inst vPAL_12(_gameselect_replace_input) 0x81327aa8 bl handle_gameselect_inputs
+patch_inst_ntsc "_gameselect_replace_input" 0x81326818 0x81326f94 0x8132732c 0x81327344 bl handle_gameselect_inputs
+patch_inst_pal "_gameselect_replace_input" 0x81327968 0x81326ec0 0x81327aa8 bl handle_gameselect_inputs
 
 .macro routine_gameselect_matrix_helper
     addi r3, r1, 0x74
@@ -60,13 +30,8 @@ patch_inst vPAL_12(_gameselect_replace_input) 0x81327aa8 bl handle_gameselect_in
 .endm
 
 # NOTE: this is a mid-finction patch
-patch_inst vNTSC_10(_gameselect_draw_helper) 0x81326c14 routine_gameselect_matrix_helper
-patch_inst vNTSC_11(_gameselect_draw_helper) 0x81327430 routine_gameselect_matrix_helper
-patch_inst vNTSC_12_001(_gameselect_draw_helper) 0x813277c8 routine_gameselect_matrix_helper
-patch_inst vNTSC_12_101(_gameselect_draw_helper) 0x813277e0 routine_gameselect_matrix_helper
-patch_inst vPAL_10(_gameselect_draw_helper) 0x81327e04 routine_gameselect_matrix_helper
-patch_inst vPAL_11(_gameselect_draw_helper) 0x8132735c routine_gameselect_matrix_helper
-patch_inst vPAL_12(_gameselect_draw_helper) 0x81327f44 routine_gameselect_matrix_helper
+patch_inst_ntsc "_gameselect_draw_helper" 0x81326c14 0x81327430 0x813277c8 0x813277e0 routine_gameselect_matrix_helper
+patch_inst_pal "_gameselect_draw_helper" 0x81327e04 0x8132735c 0x81327f44 routine_gameselect_matrix_helper
 
 // patch_inst vNTSC_11(_disable_main_menu_text) 0x81314d24 nop
 // patch_inst vNTSC_11(_disable_main_menu_cube_a) 0x8130df44 nop
@@ -89,13 +54,8 @@ patch_inst_pal  "_replace_bs2tick" 0x81300968 0x81300968 0x81300ac0 b bs2tick
 patch_inst_ntsc "_replace_bs2start_a" 0x813023e0 0x813021e8 0x81302590 0x813025a8 bl bs2start
 patch_inst_pal  "_replace_bs2start_a" 0x813021e8 0x813021e8 0x8130235c bl bs2start
 
-patch_inst vNTSC_10(_replace_bs2start_b) 0x813024a4 bl bs2start // TODO: find offsets
-patch_inst vNTSC_11(_replace_bs2start_b) 0x813022ac bl bs2start // TODO: find offsets
-patch_inst vNTSC_12_001(_replace_bs2start_b) 0x81302648 bl bs2start // TODO: find offsets
-patch_inst vNTSC_12_101(_replace_bs2start_b) 0x81302660 bl bs2start // TODO: find offsets
-patch_inst vPAL_10(_replace_bs2start_b) 0x813022ac bl bs2start // TODO: find offsets
-patch_inst vPAL_11(_replace_bs2start_b) 0x813022ac bl bs2start // TODO: find offsets
-patch_inst vPAL_12(_replace_bs2start_b) 0x81302414 bl bs2start // TODO: find offsets
+patch_inst_ntsc "_replace_bs2start_b" 0x813024a4 0x813022ac 0x81302648 0x81302660 bl bs2start
+patch_inst_pal "_replace_bs2start_b" 0x813022ac 0x813022ac 0x81302414 bl bs2start
 
 patch_inst_ntsc "_replace_report" 0x8133491c 0x8135a344 0x81300520 0x81300520 b custom_OSReport
 patch_inst_pal  "_replace_report" 0x8135d924 0x8135a264 0x81300520 b custom_OSReport
@@ -103,13 +63,8 @@ patch_inst_pal  "_replace_report" 0x8135d924 0x8135a264 0x81300520 b custom_OSRe
 patch_inst_ntsc "_patch_menu_init" 0x8130128c 0x81301094 0x81301448 0x8130144c bl pre_menu_init
 patch_inst_pal "_patch_menu_init" 0x81301094 0x81301094 0x81301200 bl pre_menu_init
 
-patch_inst vNTSC_10(_patch_menu_alpha_setup) 0x81312108 bl pre_menu_alpha_setup // TODO: find offsets
-patch_inst vNTSC_11(_patch_menu_alpha_setup) 0x81312358 bl pre_menu_alpha_setup // TODO: find offsets
-patch_inst vNTSC_12_001(_patch_menu_alpha_setup) 0x813126f0 bl pre_menu_alpha_setup // TODO: find offsets
-patch_inst vNTSC_12_101(_patch_menu_alpha_setup) 0x81312708 bl pre_menu_alpha_setup // TODO: find offsets
-patch_inst vPAL_10(_patch_menu_alpha_setup) 0x81312c3c bl pre_menu_alpha_setup // TODO: find offsets
-patch_inst vPAL_11(_patch_menu_alpha_setup) 0x81312284 bl pre_menu_alpha_setup // TODO: find offsets
-patch_inst vPAL_12(_patch_menu_alpha_setup) 0x81312d7c bl pre_menu_alpha_setup // TODO: find offsets
+patch_inst_ntsc "_patch_menu_alpha_setup" 0x81312108 0x81312358 0x813126f0 0x81312708 bl pre_menu_alpha_setup
+patch_inst_pal "_patch_menu_alpha_setup" 0x81312c3c 0x81312284 0x81312d7c bl pre_menu_alpha_setup
 
 patch_inst_pal "_fix_video_mode_init" 0x81300520 0x81300520 0x81300610 bl get_tvmode
 
