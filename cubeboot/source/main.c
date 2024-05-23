@@ -410,7 +410,7 @@ int main() {
     set_patch_value(symshdr, syment, symstringdata, "preboot_delay_ms", settings.preboot_delay_ms);
     set_patch_value(symshdr, syment, symstringdata, "postboot_delay_ms", settings.postboot_delay_ms);
 
-    unmount_current_device();
+    // unmount_current_device();
 
 #ifdef VIDEO_ENABLE
     VIDEO_WaitVSync();

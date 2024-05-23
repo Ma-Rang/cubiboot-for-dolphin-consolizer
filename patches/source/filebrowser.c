@@ -50,7 +50,7 @@ game_backing_entry_t *game_backing_list[1000];
 
 // bnr buffers for each game
 
-static game_asset_t (*game_assets)[384] = (void*)0x80400000; // needs 3mb usable
+static game_asset_t (*game_assets)[512] = (void*)0x80200000; // needs 3mb usable
 
 // draw variables
 int number_of_lines = 0;
@@ -116,7 +116,7 @@ void __DVDFSInit_threaded(game_backing_entry_t *backing) {
 
 // a function that will allocate a new entry in the asset list
 game_asset_t *claim_game_asset() {
-    for (int i = 0; i < 384; i++) {
+    for (int i = 0; i < 512; i++) {
         game_asset_t *asset = &(*game_assets)[i];
         if (!asset->in_use) {
             asset->in_use = 1;
@@ -136,7 +136,7 @@ void free_game_asset(int backing_index) {
 
 // a function that will get the current asset based on the backing index
 game_asset_t *get_game_asset(int backing_index) {
-    for (int i = 0; i < 384; i++) {
+    for (int i = 0; i < 512; i++) {
         game_asset_t *asset = &(*game_assets)[i];
         if (asset->backing_index == backing_index) {
             return asset;
@@ -212,7 +212,7 @@ void *file_enum_worker(void* param) {
     number_of_lines = (number_of_entries + 7) >> 3;
     OSReport("Current lines = %d\n", number_of_lines);
 
-    memset((void*)0x80400000, 0, 0x300000); // clear assets
+    memset((void*)0x80200000, 0, 0x300000); // clear assets
 
     // // test only
     // number_of_lines = 100;
@@ -263,7 +263,7 @@ void *file_enum_worker(void* param) {
 
         OSReport("Reading opening.bnr\n");
         BNR *banner_buffer = &game_loading_banner;
-        if (current_ent_index < 384) {
+        if (current_ent_index < 512) {
             game_asset_t *asset = &(*game_assets)[current_ent_index];
             OSReport("Claiming asset %d (@%p)\n", current_ent_index, asset);
             asset->backing_index = current_ent_index;
@@ -303,7 +303,7 @@ void *file_enum_worker(void* param) {
         current_ent_index++;
         game_backing_count = current_ent_index; // make entry active
 
-        if (current_ent_index >= 384) {
+        if (current_ent_index >= 512) {
             OSReport("ALPHA: Max game backings reached\n");
             break;
         }

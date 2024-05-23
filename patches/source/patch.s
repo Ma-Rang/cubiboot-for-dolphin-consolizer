@@ -6,13 +6,16 @@
 // patch_inst vNTSC_11(_test_only_a) 0x81301210 trap
 // patch_inst vNTSC_11(_test_only_b) 0x81336124 b _addr_81336124
 // patch_inst vNTSC_11(_skip_menu_logo) 0x8130d178 li r3, 5
-// patch_inst vNTSC_11(_reduce_heap_size) 0x81307df4 lis r5, -0x7f00 // 0x81100000 -> 0x81000000
-
-// patch_inst vNTSC_11(_force_english_lang) 0x8130b73c li r0, 0 // NTSC Only
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
+
+// patch_inst vNTSC_10(_force_lang) 0x8130b5b4 li r0, 2 // Force English=0, Japanese=2 (NTSC Only)
+patch_inst vNTSC_11(_force_lang) 0x8130b73c li r0, 2 // Force English=0, Japanese=2 (NTSC Only)
 
 patch_inst_ntsc "_reduce_arena_size" 0x813328ec 0x8135825c 0x8135d998 0x8135d998 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
 patch_inst_pal "_reduce_arena_size" 0x8135b83c 0x8135817c 0x81360d10 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
+
+patch_inst_ntsc "_increase_heap_size" 0x81307ed8 0x81307dc0 0x8130815c 0x81308174 lis r3, -0x7fa0 // 0x80700000 -> 0x806000000 (NTSC10 0x80800000 -> 0x80600000)
+patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0x7fa0 // 0x80700000 -> 0x806000000
 
 patch_inst_ntsc "_patch_thread_init" 0x81301234 0x81301070 0x81301424 0x81301428 bl pre_thread_init
 patch_inst_pal "_patch_thread_init" 0x81301070 0x81301070 0x813011dc bl pre_thread_init
