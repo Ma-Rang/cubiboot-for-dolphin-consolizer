@@ -39,8 +39,8 @@ __attribute_data__ u32 start_game = 0;
 __attribute_data__ u8 *cube_text_tex = NULL;
 __attribute_data__ u32 force_progressive = 0;
 
-__attribute_data__ static cubeboot_state local_state;
-__attribute_data__ static cubeboot_state *global_state = (cubeboot_state*)0x81700000;
+// __attribute_data__ static cubeboot_state local_state;
+// __attribute_data__ static cubeboot_state *global_state = (cubeboot_state*)0x81700000;
 
 // used if we are switching to 60Hz on a PAL IPL
 __attribute_data__ static int fix_pal_ntsc = 0;
@@ -336,25 +336,25 @@ __attribute_used__ u32 get_tvmode() {
 
 __attribute_data__ int frame_count = 0;
 __attribute_used__ u32 bs2tick() {
-    // TODO: move this check to PADRead in main loop
-    if (pad_status->pad.button != local_state.last_buttons) {
-        for (int i = 0; i < MAX_BUTTONS; i++) {
-            u16 bitmask = 1 << i;
-            u16 pressed = (pad_status->pad.button & bitmask) >> i;
+    // // TODO: move this check to PADRead in main loop
+    // if (pad_status->pad.button != local_state.last_buttons) {
+    //     for (int i = 0; i < MAX_BUTTONS; i++) {
+    //         u16 bitmask = 1 << i;
+    //         u16 pressed = (pad_status->pad.button & bitmask) >> i;
 
-            // button changed state
-            if (local_state.held_buttons[i].status != pressed) {
-                if (pressed) {
-                    local_state.held_buttons[i].timestamp = gettime();
-                } else {
-                    local_state.held_buttons[i].timestamp = 0;
-                }
-            }
+    //         // button changed state
+    //         if (local_state.held_buttons[i].status != pressed) {
+    //             if (pressed) {
+    //                 local_state.held_buttons[i].timestamp = gettime();
+    //             } else {
+    //                 local_state.held_buttons[i].timestamp = 0;
+    //             }
+    //         }
 
-            local_state.held_buttons[i].status = pressed;
-        }
-    }
-    local_state.last_buttons = pad_status->pad.button;
+    //         local_state.held_buttons[i].status = pressed;
+    //     }
+    // }
+    // local_state.last_buttons = pad_status->pad.button;
 
     frame_count++;
     if (!completed_time && cube_state->cube_anim_done) {
@@ -451,8 +451,8 @@ __attribute_used__ void bs2start() {
     stop_loading_games = 1;
     DCFlushRange((void*)&stop_loading_games, sizeof(stop_loading_games));
 
-    memcpy(global_state, &local_state, sizeof(cubeboot_state));
-    global_state->boot_code = 0xCAFEBEEF;
+    // memcpy(global_state, &local_state, sizeof(cubeboot_state));
+    // global_state->boot_code = 0xCAFEBEEF;
 
     // if (prog_entrypoint == 0) {
     //     OSReport("HALT: No program\n");
@@ -465,6 +465,8 @@ __attribute_used__ void bs2start() {
 
     OSReport("we are about to open %s\n", boot_path);
     // udelay(100 * 1000);
+
+    // read boot info into lowmem
 
     int ret = dvd_custom_open(IPC_DEVICE_SD, boot_path, FILE_ENTRY_TYPE_FILE, 0);
     OSReport("OPEN ret: %08x\n", ret);

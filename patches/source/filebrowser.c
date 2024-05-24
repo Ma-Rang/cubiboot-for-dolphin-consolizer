@@ -1,4 +1,5 @@
 #include <string.h>
+#include <limits.h>
 
 #include "picolibc.h"
 #include "time.h"
@@ -61,6 +62,7 @@ int number_of_lines = 0;
 
 // start code
 void weird_panic() {
+    // TODO: set XFB
     OSReport("PANIC: unknown\n");
     while(1);
 }
@@ -76,16 +78,48 @@ static u32 total_entries = 0; //r13_441C
 static char* string_table = NULL; //r13_4420
 static FSTEntry* entry_table = NULL; //r13_4424
 static u8 *fst = NULL;
-static u8 __attribute__((aligned(32))) fst_buf[0x80000];
 static DiskHeader __attribute__((aligned(32))) header;
 static BNR __attribute__((aligned(32))) game_loading_banner;
 
 extern volatile u32 stop_loading_games;
 
+// return the specified letter in lowercase
+char my_tolower(int c) {
+    // (int)a = 97, (int)A = 65
+    // (a)97 - (A)65 = 32
+    // therefore 32 + 65 = a
+    return c > 64 && c < 91 ? c + 32 : c;
+}
+
+int strncmpci(const char * str1, const char * str2, size_t num) {
+    int ret_code = 0;
+    size_t chars_compared = 0;
+
+    if (!str1 || !str2)
+    {
+        ret_code = INT_MIN;
+        return ret_code;
+    }
+
+    while ((chars_compared < num) && (*str1 || *str2))
+    {
+        ret_code = my_tolower((int)(*str1)) - my_tolower((int)(*str2));
+        if (ret_code != 0)
+        {
+            break;
+        }
+        chars_compared++;
+        str1++;
+        str2++;
+    }
+
+    return ret_code;
+}
+
 void __DVDFSInit_threaded(game_backing_entry_t *backing) {
     u32 size = OSRoundUp32B(backing->fst_size);
 
-    fst = &fst_buf[0];
+    fst = (void*)0x81700000;
     
     for (u32 i = 0; size > 0; i++) {
         if (size > 0x4000) {
@@ -109,7 +143,7 @@ void __DVDFSInit_threaded(game_backing_entry_t *backing) {
         u32 string_offset = GET_OFFSET(p[i].offset);
         char *string = (char*)((u32)string_table + string_offset);
         // OSReport("FST (0x%08x) entry: %s\n", FILE_POSITION(i), string);
-        if (entry_table[i].filetype == T_FILE && strcmp(string, "opening.bnr") == 0) {
+        if (entry_table[i].filetype == T_FILE && strncmpci(string, "opening.bnr", strlen("opening.bnr")) == 0) {
             OSReport("FST (0x%08x) entry: %s\n", FILE_POSITION(i), string);
             backing->dvd_bnr_size = FILE_LENGTH(i);
             backing->dvd_bnr_offset = FILE_POSITION(i);
