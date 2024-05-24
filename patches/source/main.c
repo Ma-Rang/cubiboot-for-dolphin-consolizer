@@ -467,6 +467,11 @@ __attribute_used__ void bs2start() {
     // udelay(100 * 1000);
 
     // read boot info into lowmem
+    struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
+    lowmem->a_boot_magic = 0x0D15EA5E;
+    lowmem->a_version = 0x00000001;
+    lowmem->b_physical_memory_size = 0x01800000;
+    dvd_read(&lowmem->b_disk_info, 0x20, 0);
 
     int ret = dvd_custom_open(IPC_DEVICE_SD, boot_path, FILE_ENTRY_TYPE_FILE, 0);
     OSReport("OPEN ret: %08x\n", ret);
