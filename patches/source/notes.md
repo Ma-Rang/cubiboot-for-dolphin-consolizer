@@ -14,3 +14,5 @@ BS2 runs OSInit which clears high-mem up to 0x81700000
 Patches for BS2 can safely be placed at 0x81700000
 
 In game, VIConfigure panics if 0x800000CC doesn't match the TV mode about to be configured
+
+NTSC10 uses 0x80700000 as slab memory for decoding font data

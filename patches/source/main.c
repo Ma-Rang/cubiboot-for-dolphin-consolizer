@@ -363,21 +363,21 @@ __attribute_used__ u32 bs2tick() {
     }
 
     // this helps the start menu show correctly
-    if (cube_state->cube_anim_done) {
+    if (*main_menu_id >= 3) {
         return STATE_START_GAME;
     }
 
-    if (start_game && !TEST_ONLY_force_boot_menu) {
-        if (postboot_delay_ms) {
-            u64 elapsed = diff_msec(completed_time, gettime());
-            if (completed_time > 0 && elapsed > postboot_delay_ms) {
-                return STATE_START_GAME;
-            } else {
-                return STATE_WAIT_LOAD;
-            }
-        }
-        return STATE_START_GAME;
-    }
+    // if (start_game && !TEST_ONLY_force_boot_menu) {
+    //     if (postboot_delay_ms) {
+    //         u64 elapsed = diff_msec(completed_time, gettime());
+    //         if (completed_time > 0 && elapsed > postboot_delay_ms) {
+    //             return STATE_START_GAME;
+    //         } else {
+    //             return STATE_WAIT_LOAD;
+    //         }
+    //     }
+    //     return STATE_START_GAME;
+    // }
 
 #ifdef TEST_SKIP_ANIMATION
     if (TEST_ONLY_skip_animation) {
@@ -476,6 +476,7 @@ __attribute_used__ void bs2start() {
     lowmem->b_physical_memory_size = 0x01800000;
     dvd_read(&lowmem->b_disk_info, 0x20, 0);
 
+    memset((void*)0x80100000, 0, 0x81200000 - 0x80100000); // cleanup
     prog_entrypoint = (u32)LoadGame_Apploader();
 
     OSReport("booting...\n");

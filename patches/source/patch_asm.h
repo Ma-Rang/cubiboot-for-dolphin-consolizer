@@ -23,6 +23,8 @@
 #define pal11_sym(x) pal11_##x
 #define pal12_sym(x) pal12_##x
 
+#define inst_pause_forever .long 0x48000000
+
 .set vNTSC_10(_SDA_BASE_), 0x81465320
 .set vNTSC_11(_SDA_BASE_), 0x81489120
 .set vNTSC_12_001(_SDA_BASE_), 0x8148b1c0

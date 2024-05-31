@@ -28,7 +28,7 @@ void DCFlushRange(void *addr, u32 nBytes)
 	asm volatile("sc" ::: "r9", "r10");
 }
 
-#if 0
+#if 1
 void DCFlushRangeNoSync(void *addr, u32 nBytes)
 {
 	if (!nBytes) return;

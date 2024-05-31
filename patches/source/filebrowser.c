@@ -54,8 +54,7 @@ game_backing_entry_t *sorted_raw_game_backing_list[1000];
 game_backing_entry_t *game_backing_list[1000];
 
 // bnr buffers for each game
-
-static game_asset_t (*game_assets)[512] = (void*)0x80200000; // needs 3mb usable
+static game_asset_t (*game_assets)[512] = (void*)0x80100000; // needs 4mb usable
 
 // draw variables
 int number_of_lines = 0;
@@ -316,6 +315,8 @@ void *file_enum_worker(void* param) {
             OSReport("Claiming asset %d (@%p)\n", current_ent_index, asset);
             asset->backing_index = current_ent_index;
             asset->in_use = 1;
+
+            memcpy(&asset->game_id[0], &game_id[0], sizeof(game_id));
 
             banner_buffer = (void*)&asset->banner;
         }

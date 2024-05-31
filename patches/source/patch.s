@@ -3,19 +3,40 @@
 #include "patch_asm.h"
 
 // patch_inst vNTSC_11(_change_background_color) 0x81481cc8 .4byte 0xFFFF00FF
-// patch_inst vNTSC_11(_test_only_a) 0x81301210 trap
-// patch_inst vNTSC_11(_test_only_b) 0x81336124 b _addr_81336124
-// patch_inst vNTSC_11(_skip_menu_logo) 0x8130d178 li r3, 5
+// patch_inst vNTSC_10(_test_only_a) 0x81302778 nop
+// patch_inst vNTSC_10(_test_only_b) 0x813269a4 li r0, 255
+// patch_inst vPAL_10(_test_only) 0x8130825c inst_pause_forever
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
+// patch_inst vNTSC_11(_skip_menu_logo_a) 0x8130bcb4 li r3, 1
+// patch_inst vNTSC_11(_skip_menu_logo_b) 0x8130bcc0 li r0, 5
 
-// patch_inst vNTSC_10(_force_lang) 0x8130b5b4 li r0, 2 // Force English=0, Japanese=2 (NTSC Only)
-// patch_inst vNTSC_11(_force_lang) 0x8130b73c li r0, 2 // Force English=0, Japanese=2 (NTSC Only)
+// patch_inst_ntsc "_force_lang" 0x8130b5b8 0x8130b740 0x8130bab4 0x8130bacc bl set_forced_lang
+patch_inst_ntsc "_force_lang" 0x8130b5b4 0x8130b73c 0x8130bab0 0x8130bac8 li r0, 0 // Force English=0, Japanese=2 (NTSC Only)
+patch_inst_pal "_fix_font_japanese" 0x81309600 0x00000000 0x81309740 b GetFontCode
+patch_inst vNTSC_10(_fix_font_decode_buf) 0x813083d0 lis r3, -0x7e90 // Move buffer to himem (0x81700000)
+patch_inst vNTSC_10(_fix_banner_bnr2) 0x81302778 nop
+
+patch_inst_ntsc "_patch_font_init" 0x81301240 0x8130107c 0x81301430 0x81301434 bl setup_fonts
+patch_inst_pal "_patch_font_init" 0x8130107c 0x8130107c 0x813011e8 bl setup_fonts
+
+patch_inst_ntsc "_patch_card_status" 0x8131c770 0x8131ce9c 0x8131d234 0x8131d24c bl save_card_status
+patch_inst_pal "_patch_card_status" 0x8131d848 0x8131cdc8 0x8131d988 bl save_card_status
+
+patch_inst_ntsc "_patch_card_info_a" 0x8131a694 0x8131aca0 0x8131b038 0x8131b050 bl patched_card_info
+patch_inst_pal "_patch_card_info_a" 0x8131b64c 0x8131abcc 0x8131b78c bl patched_card_info
+
+patch_inst_ntsc "_patch_card_info_b" 0x8131a6bc 0x8131acc8 0x8131b060 0x8131b078 bl patched_card_info
+patch_inst_pal "_patch_card_info_b" 0x8131b674 0x8131abf4 0x8131b7b4 bl patched_card_info
+
+patch_inst_ntsc "_fix_card_info" 0x81319000 0x81319600 0x81319998 0x813199b0 bl fix_card_info
+patch_inst_pal "_fix_card_info" 0x81319fac 0x8131952c 0x8131a0ec bl fix_card_info
 
 patch_inst_ntsc "_reduce_arena_size" 0x813328ec 0x8135825c 0x8135d998 0x8135d998 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
 patch_inst_pal "_reduce_arena_size" 0x8135b83c 0x8135817c 0x81360d10 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
 
-patch_inst_ntsc "_increase_heap_size" 0x81307ed8 0x81307dc0 0x8130815c 0x81308174 lis r3, -0x7fa0 // 0x80700000 -> 0x806000000 (NTSC10 0x80800000 -> 0x80600000)
-patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0x7fa0 // 0x80700000 -> 0x806000000
+patch_inst vNTSC_10(_increase_heap_size) 0x81307ed8 lis r3, -0x7fa0 // NTSC10: 0x80800000 -> 0x80600000 (stability hack)
+patch_inst_ntsc "_increase_heap_size" 0x00000000 0x81307dc0 0x8130815c 0x81308174 lis r3, -0x7fb0 // 0x80700000 -> 0x805000000
+patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0x7fb0 // 0x80700000 -> 0x806000000
 
 patch_inst_ntsc "_patch_thread_init" 0x81301234 0x81301070 0x81301424 0x81301428 bl pre_thread_init
 patch_inst_pal "_patch_thread_init" 0x81301070 0x81301070 0x813011dc bl pre_thread_init
@@ -36,7 +57,7 @@ patch_inst_pal "_gameselect_replace_input" 0x81327968 0x81326ec0 0x81327aa8 bl h
     rept_inst 44 nop
 .endm
 
-# NOTE: this is a mid-finction patch
+// NOTE: this is a mid-finction patch
 patch_inst_ntsc "_gameselect_draw_helper" 0x81326c14 0x81327430 0x813277c8 0x813277e0 routine_gameselect_matrix_helper
 patch_inst_pal "_gameselect_draw_helper" 0x81327e04 0x8132735c 0x81327f44 routine_gameselect_matrix_helper
 

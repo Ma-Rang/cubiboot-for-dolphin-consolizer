@@ -13,6 +13,8 @@
 #include "grid.h"
 #include "filebrowser.h"
 
+#include "font.h"
+
 // TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
 #include "../build/default_opening_bin.h"
 #include "../../cubeboot/include/gcm.h"
@@ -48,6 +50,7 @@ __attribute_reloc__ void (*draw_start_info)(u8 alpha);
 __attribute_reloc__ void (*draw_start_anim)(u8 alpha);
 __attribute_reloc__ void (*draw_blob_fixed)(void *blob_ptr, void *blob_a, void *blob_b, GXColor *color);
 __attribute_reloc__ void (*draw_blob_text)(u32 type, void *blob, GXColor *color, char *str, s32 len);
+__attribute_reloc__ void (*draw_blob_text_long)(u32 type, void *blob, GXColor *color, char *str, s32 len);
 __attribute_reloc__ void (*draw_blob_border)(u32 type, void *blob, GXColor *color);
 __attribute_reloc__ void (*draw_blob_tex)(u32 type, void *blob, GXColor *color, tex_data *dat);
 __attribute_reloc__ void (*setup_tex_draw)(s32 unk0, s32 unk1, s32 unk2);
@@ -352,7 +355,7 @@ __attribute_used__ void draw_info_box(GXColor *color) {
     return;
 }
 
-#define WITH_SPACE 1
+// #define WITH_SPACE 1
 u32 move_frame = 0;
 
 void setup_icon_positions() {
@@ -473,11 +476,15 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
 
     game_asset_t *asset = get_game_asset(selected_slot);
     if (asset != NULL && selected_slot < game_backing_count) {
+        if (asset->game_id[3] == 'J') switch_lang_jpn();
+        else switch_lang_eng();
+
         // info
         draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, asset->banner.desc->fullGameName, 0x1f);
         draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, asset->banner.desc->description, 0x1f);
 
         // game source
+        switch_lang_eng();
         draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
         draw_text("ISO", 20, 125, 540, &white);
 
@@ -485,6 +492,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
         setup_tex_draw(1, 0, 1);
         banner_texture.offset = (s32)((u32)(asset->banner.pixelData) - (u32)&banner_texture);
         draw_blob_tex(make_type('b','a','n','a'), menu_blob, &white, &banner_texture);
+        switch_lang_orig();
     }
 
     return;
@@ -495,8 +503,23 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     u8 ui_alpha = alpha_1;
     GXColor white = {0xFF, 0xFF, 0xFF, ui_alpha};
 
-    // banner and info
-    draw_start_info(ui_alpha); // TODO: fix alpha timing
+    game_asset_t *asset = get_game_asset(selected_slot);
+    if (asset->game_id[3] == 'J') switch_lang_jpn();
+    else switch_lang_eng();
+
+    // game banner
+    setup_tex_draw(1, 0, 1);
+    banner_texture.offset = (s32)((u32)(asset->banner.pixelData) - (u32)&banner_texture);
+    draw_blob_tex(make_type('b','a','n','a'), game_blob_b, &white, &banner_texture);
+
+    // game info
+    prep_text_mode();
+    draw_blob_text(make_type('t','i','t','l'), game_blob_b, &white, asset->banner.desc->fullGameName, 0x40);
+    draw_blob_text(make_type('m','a','k','r'), game_blob_b, &white, asset->banner.desc->fullCompany, 0x40);
+    draw_blob_text_long(make_type('i','n','f','o'), game_blob_b, &white, asset->banner.desc->description, 0x80);
+
+    // // banner and info
+    // draw_start_info(ui_alpha); // this actually still works
 
     // press start anim
     draw_start_anim(ui_alpha); // TODO: fix alpha timing
@@ -505,6 +528,7 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     setup_gameselect_menu(0, 0, 0);
 
     // start string
+    switch_lang_orig();
     draw_blob_fixed(game_blob_text, game_blob_a, game_blob_b, &white);
 
     return;
@@ -607,6 +631,8 @@ __attribute_used__ s32 handle_gameselect_inputs() {
             Jac_PlaySe(SOUND_SUBMENU_ENTER);
             setup_gameselect_anim();
             setup_cube_anim();
+
+            OSReport("Selected slot: %d (%p)\n", selected_slot, asset);
         }
     }
 
@@ -640,7 +666,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
 
         if (pad_status->analog_down & ANALOG_DOWN) {
             if (number_of_lines - top_line_num == 4 && (selected_slot + 8) > (number_of_lines * 8 - 1)) {
-                OSReport("SKIP MOVE DOWN: top_line_num = %d\n", top_line_num);
+                // OSReport("SKIP MOVE DOWN: top_line_num = %d\n", top_line_num);
                 Jac_PlaySe(SOUND_CARD_ERROR);
             } else {
                 Jac_PlaySe(SOUND_CARD_MOVE);
@@ -658,7 +684,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
 
         if (pad_status->analog_down & ANALOG_UP) {
             if (top_line_num == 0 && (selected_slot - 8) < 0) {
-                OSReport("SKIP MOVE UP: top_line_num = %d\n", top_line_num);
+                // OSReport("SKIP MOVE UP: top_line_num = %d\n", top_line_num);
                 Jac_PlaySe(SOUND_CARD_ERROR);
             } else {
                 Jac_PlaySe(SOUND_CARD_MOVE);
@@ -673,8 +699,8 @@ __attribute_used__ s32 handle_gameselect_inputs() {
                 }
             }
             
-            OSReport("top_line_num = %d\n", top_line_num);
-            OSReport("selected_slot = %d\n", selected_slot);
+            // OSReport("top_line_num = %d\n", top_line_num);
+            // OSReport("selected_slot = %d\n", selected_slot);
         }
     }
 

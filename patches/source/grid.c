@@ -89,7 +89,7 @@ void grid_add_anim(int line_num, int direction, f32 distance) {
 
 
 int grid_dispatch_navigate_up() {
-    OSReport("Up pressed %d\n", number_of_lines);
+    // OSReport("Up pressed %d\n", number_of_lines);
 
     int max_pending = 0;
     for (int line_num = 0; line_num < number_of_lines; line_num++) {
@@ -126,7 +126,7 @@ int grid_dispatch_navigate_up() {
             line_backing->moving_out = false;
 
             found_move_in = true;
-            OSReport("Moving in %d\n", line_num);
+            // OSReport("Moving in %d\n", line_num);
             grid_add_anim(line_num, ANIM_DIRECTION_DOWN, anim_distance);
         } else if (partial_position_y < (DRAW_BOUND_BOTTOM + offset_y - 10) && partial_position_y >= (DRAW_BOUND_TOP - offset_y + 10)) {
             grid_add_anim(line_num, ANIM_DIRECTION_DOWN, offset_y);
@@ -142,7 +142,7 @@ int grid_dispatch_navigate_up() {
             line_backing->moving_in = false;
 
             found_move_out = true;
-            OSReport("Moving out %d\n", line_num);
+            // OSReport("Moving out %d\n", line_num);
             // OSReport("Current position = %f\n", position_y);
             // OSReport("End position = %f\n", end_position_y);
         }
@@ -157,7 +157,7 @@ int grid_dispatch_navigate_up() {
 }
 
 int grid_dispatch_navigate_down() {
-    OSReport("Down pressed %d\n", number_of_lines);
+    // OSReport("Down pressed %d\n", number_of_lines);
 
     // check all anims full or empty
     // calculate final pos after all pending anims would complete
@@ -212,7 +212,7 @@ int grid_dispatch_navigate_down() {
             line_backing->moving_out = false;
 
             found_move_in = true;
-            OSReport("Moving in %d\n", line_num);
+            // OSReport("Moving in %d\n", line_num);
             grid_add_anim(line_num, ANIM_DIRECTION_UP, anim_distance);
         } else if (partial_position_y < (DRAW_BOUND_BOTTOM + offset_y - 10) && partial_position_y >= (DRAW_BOUND_TOP - offset_y + 10)) {
             grid_add_anim(line_num, ANIM_DIRECTION_UP, offset_y);
