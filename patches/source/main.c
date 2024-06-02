@@ -545,12 +545,10 @@ __attribute_used__ void bs2start() {
 
         // set video mode PAL
         u32 mode = rmode->viTVMode >> 2;
-        if (mode == VI_PAL || mode == VI_MPAL) {
-            if (mode == VI_MPAL) {
-                lowmem->tv_mode = 5;
-            } else {
-                lowmem->tv_mode = 1;
-            }
+        if (mode == VI_MPAL) {
+            lowmem->tv_mode = 5;
+        } else {
+            lowmem->tv_mode = 1;
         }
     } else {
         OSReport("NTSC game detected\n");
