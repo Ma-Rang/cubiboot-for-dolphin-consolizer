@@ -537,24 +537,32 @@ __attribute_used__ void bs2start() {
         dvd_read(&lowmem->b_disk_info, 0x20, 0);
 
         prog_entrypoint = (u32)LoadGame_Apploader();
-    }
 
-    if (lowmem->b_disk_info.game_code[3] == 'P') {
-        OSReport("PAL game detected\n");
-        ogc__VIInit(VI_TVMODE_PAL_INT);
+        struct gcm_disk_header_info *bi2 = lowmem->a_bi2;
 
-        // set video mode PAL
-        u32 mode = rmode->viTVMode >> 2;
-        if (mode == VI_MPAL) {
-            lowmem->tv_mode = 5;
+        OSReport("BI2: %08x\n", bi2);
+        OSReport("Country: %x\n", bi2->country_code);
+
+        // game id
+        OSReport("Game ID: %c%c%c%c\n", lowmem->b_disk_info.game_code[0], lowmem->b_disk_info.game_code[1], lowmem->b_disk_info.game_code[2], lowmem->b_disk_info.game_code[3]);
+
+        if (bi2->country_code == COUNTRY_EUR) {
+            OSReport("PAL game detected\n");
+            ogc__VIInit(VI_TVMODE_PAL_INT);
+
+            // set video mode PAL
+            u32 mode = rmode->viTVMode >> 2;
+            if (mode == VI_MPAL) {
+                lowmem->tv_mode = 5;
+            } else {
+                lowmem->tv_mode = 1;
+            }
         } else {
-            lowmem->tv_mode = 1;
-        }
-    } else {
-        OSReport("NTSC game detected\n");
-        ogc__VIInit(VI_TVMODE_NTSC_INT);
+            OSReport("NTSC game detected\n");
+            ogc__VIInit(VI_TVMODE_NTSC_INT);
 
-        lowmem->tv_mode = 0;
+            lowmem->tv_mode = 0;
+        }
     }
 
     custom_OSReport("booting... (%08x)\n", prog_entrypoint);
