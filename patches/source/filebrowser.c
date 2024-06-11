@@ -8,7 +8,6 @@
 #include "paths.h"
 #include "config.h"
 
-#include "gc_dvd.h"
 #include "dolphin_os.h"
 #include "dolphin_dvd.h"
 #include "dolphin_arq.h"
@@ -17,6 +16,9 @@
 #include "filebrowser.h"
 #include "util.h"
 #include "os.h"
+
+#include "flippy_sync.h"
+#include "dvd_threaded.h"
 
 #include "../../cubeboot/include/bnr.h"
 
@@ -120,17 +122,17 @@ int strncmpci(const char * str1, const char * str2, size_t num) {
     return ret_code;
 }
 
-void __DVDFSInit_threaded(game_backing_entry_t *backing) {
+void __DVDFSInit_threaded(uint32_t fd, game_backing_entry_t *backing) {
     u32 size = OSRoundUp32B(backing->fst_size);
 
     fst = (void*)0x81700000;
     
     for (u32 i = 0; size > 0; i++) {
         if (size > 0x4000) {
-            dvd_threaded_read(fst + (i * 0x4000), 0x4000, (backing->fst_offset + (0x4000 * i)));
+            dvd_threaded_read(fst + (i * 0x4000), 0x4000, (backing->fst_offset + (0x4000 * i)), fd);
             size -= 0x4000;
         } else {
-            dvd_threaded_read(fst + (i * 0x4000), size, (backing->fst_offset + (0x4000 * i)));
+            dvd_threaded_read(fst + (i * 0x4000), size, (backing->fst_offset + (0x4000 * i)), fd);
             size = 0;
         }
     }
@@ -203,21 +205,21 @@ const char *get_game_path(int backing_index) {
 
 static int early_file_enum() {
     u64 start_time = gettime();
-    // dvd_custom_open(IPC_DEVICE_SD, SD_TARGET_PATH, FILE_ENTRY_TYPE_DIR, 0); // reset readdir
 
-    // // TODO: fallback to WiFi
-    // file_status_t status;
-    // dvd_custom_status(IPC_DEVICE_SD, &status);
-    // if (status.result != 0) {
+    // dvd_custom_open("/", FILE_ENTRY_TYPE_DIR, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK); // reset readdir
+
+    // // // TODO: fallback to WiFi
+    // file_status_t *status = dvd_custom_status();
+    // if (status->result != 0) {
     //     OSReport("PANIC: SD Card could not be opened\n");
     //     while(1);
     // }
 
-    file_entry_t ent;
+    static GCN_ALIGNED(file_entry_t) ent;
     int current_ent_index = 0;
     int ret = 0;
     while(1) {
-        ret = dvd_custom_readdir(IPC_DEVICE_SD, &ent);
+        ret = dvd_custom_readdir(&ent, 0);
         if (ret != 0) weird_panic();
         if (ent.name[0] == 0)
             break;
@@ -242,9 +244,6 @@ static int early_file_enum() {
 
         if (strncmpci(ext, ".dol", 4) == 0 || strncmpci(ext, ".dol+cli", 8) == 0)
             game_backing->is_dol = true;
-
-        // ret = dvd_custom_open(IPC_DEVICE_SD, game_backing->iso_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
-        // OSReport("OPEN ret: %d\n", ret);
 
         sorted_raw_game_backing_list[current_ent_index] = game_backing;
         current_ent_index++;
@@ -289,11 +288,15 @@ void *file_enum_worker(void* param) {
 
         OSReport("game backing: %d\n", i);
         game_backing_entry_t *game_backing = sorted_raw_game_backing_list[i];
-        int ret = dvd_threaded_custom_open(IPC_DEVICE_SD, game_backing->iso_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
+        int ret = dvd_custom_open(game_backing->iso_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
         if (ret != 0) {
             weird_panic();
         }
         OSYieldThread();
+
+        file_status_t *status = dvd_custom_status();
+        // TODO: check error
+        // if (status->result != 0) {...}
 
         if (game_backing->is_dol) {
             OSReport("DOL loaded: %s\n", game_backing->iso_path);
@@ -318,13 +321,14 @@ void *file_enum_worker(void* param) {
 
         } else {
             OSReport("BEFORE THREAD READ, %p\n", &header);
-            dvd_threaded_read(&header, sizeof(DiskHeader), 0); //Read in the disc header
+            dvd_threaded_read(&header, sizeof(DiskHeader), 0, status->fd); //Read in the disc header
             OSYieldThread();
 
             if (header.DVDMagicWord != 0xC2339F3D) {
                 //We'll do some error handling for this later
                 OSReport("ERROR ERROR! MAGIC IS BAD, %08x\n", header.DVDMagicWord);
                 OSReport("skipping bad ISO: %s\n", game_backing->iso_path);
+                dvd_custom_close(status->fd);
                 continue;
             } else {
                 game_backing->is_gcm = true;
@@ -344,9 +348,10 @@ void *file_enum_worker(void* param) {
             DCFlushRange(&header, sizeof(DiskHeader));
 
             OSReport("FSTSize = 0x%08x\n", game_backing->fst_size);
-            __DVDFSInit_threaded(game_backing);
+            __DVDFSInit_threaded(status->fd, game_backing);
             if (game_backing->dvd_bnr_offset == 0) {
                 OSReport("No opening.bnr found, skipping\n");
+                dvd_custom_close(status->fd);
                 continue;
             }
 
@@ -363,17 +368,18 @@ void *file_enum_worker(void* param) {
                 banner_buffer = (void*)&asset->banner;
             }
 
-            dvd_threaded_read(banner_buffer, game_backing->dvd_bnr_size, game_backing->dvd_bnr_offset); //Read banner file
+            dvd_threaded_read(banner_buffer, game_backing->dvd_bnr_size, game_backing->dvd_bnr_offset, status->fd); //Read banner file
             OSYieldThread();
 
             // print the 4 bytes of the magic
             OSReport("BNR magic: %c%c%c%c\n", banner_buffer->magic[0], banner_buffer->magic[1], banner_buffer->magic[2], banner_buffer->magic[3]);
 
-            // u32 bnr_magic = *(u32*)banner_buffer->magic[0];
-            // if (bnr_magic != 0x424e5231 && bnr_magic != 0x424e5232) {
-            //     OSReport("Invalid banner magic, skipping\n");
-            //     continue;
-            // }
+            u32 bnr_magic = *(u32*)&banner_buffer->magic[0];
+            if (bnr_magic != 0x424e5231 && bnr_magic != 0x424e5232) {
+                OSReport("Invalid banner magic, skipping\n");
+                dvd_custom_close(status->fd);
+                continue;
+            }
 
             if (banner_buffer->desc[0].fullGameName[0] == 0) {
                 strncpy(banner_buffer->desc[0].fullGameName, game_backing->disc_name, 63);
@@ -389,6 +395,8 @@ void *file_enum_worker(void* param) {
             // aram_copy(&game_backing->aram_req, banner_buffer, 0x0200000 + (i * sizeof(BNR)), sizeof(BNR));
         }
 
+        // done using file
+        dvd_custom_close(status->fd);
 
         // register game backing
         game_backing_list[current_ent_index] = game_backing;

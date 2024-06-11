@@ -14,7 +14,7 @@
 #include "reloc.h"
 #include "menu.h"
 
-#include "gc_dvd.h"
+#include "flippy_sync.h"
 #include "filebrowser.h"
 
 #include "video.h"
@@ -411,12 +411,12 @@ void* LoadGame_Apploader() {
     // SetMSR(msr);
 
     // start disc drive & read apploader
-    err = dvd_read(buffer,0x20,0x2440);
+    err = dvd_read(buffer,0x20,0x2440, 0);
     if (err) {
         OSReport("Could not load apploader header\n");
         while(1);
     }
-    err = dvd_read((void*)0x81200000,((*(unsigned long*)((u32)buffer+0x14)) + 31) &~31,0x2460);
+    err = dvd_read((void*)0x81200000,((*(unsigned long*)((u32)buffer+0x14)) + 31) &~31,0x2460, 0);
     if (err) {
         OSReport("Could not load apploader data\n");
         while(1);
@@ -433,7 +433,7 @@ void* LoadGame_Apploader() {
         int res = app_main(&dst,&len,&offset);
 		custom_OSReport("res = %d\n", res);
         if (!res) break;
-        err = dvd_read(dst,len,offset);
+        err = dvd_read(dst,len,offset,0);
         if (err) {
             custom_OSReport("Apploader read failed\n");
             while(1);
@@ -477,9 +477,14 @@ __attribute_used__ void bs2start() {
     OSReport("we are about to open %s\n", boot_path);
     // udelay(100 * 1000);
 
-    int ret = dvd_custom_open(IPC_DEVICE_SD, boot_path, FILE_ENTRY_TYPE_FILE, 0);
+    int ret = dvd_custom_open(boot_path, FILE_ENTRY_TYPE_FILE, 0);
     OSReport("OPEN ret: %08x\n", ret);
     (void)ret;
+
+    file_status_t *file_status = dvd_custom_status();
+    // TODO check for error
+    // if (file_status->result != 0) {...}
+    dvd_set_default_fd(file_status->fd);
 
     while (!PADSync());
     OSDisableInterrupts();
@@ -510,19 +515,19 @@ __attribute_used__ void bs2start() {
         // custom_OSReport("DOL size: %x\n", dol_size);
 
         DOLHEADER *hdr = &dol_hdr;
-        dvd_read(hdr, sizeof(DOLHEADER), 0);
+        dvd_read(hdr, sizeof(DOLHEADER), 0, 0);
 
         // Inspect text sections to see if what we found lies in here
         for (int i = 0; i < MAXTEXTSECTION; i++) {
             if (hdr->textAddress[i] && hdr->textLength[i]) {
-                dvd_read((void*)hdr->textAddress[i], hdr->textLength[i], hdr->textOffset[i]);
+                dvd_read((void*)hdr->textAddress[i], hdr->textLength[i], hdr->textOffset[i], 0);
             }
         }
 
         // Inspect data sections (shouldn't really need to unless someone was sneaky..)
         for (int i = 0; i < MAXDATASECTION; i++) {
             if (hdr->dataAddress[i] && hdr->dataLength[i]) {
-                dvd_read((void*)hdr->dataAddress[i], hdr->dataLength[i], hdr->dataOffset[i]);
+                dvd_read((void*)hdr->dataAddress[i], hdr->dataLength[i], hdr->dataOffset[i], 0);
             }
         }
 
@@ -534,7 +539,7 @@ __attribute_used__ void bs2start() {
 
         prog_entrypoint = hdr->entryPoint;
     } else {
-        dvd_read(&lowmem->b_disk_info, 0x20, 0);
+        dvd_read(&lowmem->b_disk_info, 0x20, 0, 0);
 
         prog_entrypoint = (u32)LoadGame_Apploader();
 

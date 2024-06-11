@@ -105,8 +105,11 @@ void load_ipl() {
 #ifdef TEST_IPL_PATH
     int ret = dvd_custom_open(TEST_IPL_PATH, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
     iprintf("OPEN ret: %08x\n", ret);
-
-    dvd_read(bios_buffer, IPL_SIZE, 0);
+    file_status_t *status = dvd_custom_status();
+    // TODO: check for error
+    // if (status->result != 0) {...}
+    dvd_read(bios_buffer, IPL_SIZE, status->fd);
+    dvd_custom_close(status->fd);
     iprintf("TEST IPL A, %08x\n", *(u32*)bios_buffer);
     iprintf("TEST IPL C, %08x\n", *(u32*)(bios_buffer + DECRYPT_START));
     Descrambler(bios_buffer + DECRYPT_START, IPL_ROM_FONT_SJIS - DECRYPT_START);
