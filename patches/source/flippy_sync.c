@@ -5,6 +5,7 @@
 
 #include "flippy_sync.h"
 #include "reloc.h"
+#include "time.h"
 
 #ifdef NOSYS
 // we don't know where this is defined
@@ -179,7 +180,6 @@ void dvd_set_default_fd(uint32_t fd) {
 }
 
 int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
-
     if (offset >> 2 > 0xFFFFFFFF) return -1;
 
     /* TODO What was going on with this setup code previously? Seems wrong
@@ -209,6 +209,30 @@ int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
     }
 	return 0;
 }
+
+int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd) {
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+	_di_regs[DI_CVR] = 0; // clear cover int
+
+    _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_WRITE | ((fd & 0xFF) << 16);
+    _di_regs[DI_CMDBUF1] = offset;
+    _di_regs[DI_CMDBUF2] = length;
+
+    _di_regs[DI_MAR] = (u32)buf & 0x1FFFFFFF;
+    _di_regs[DI_LENGTH] = length;
+    _di_regs[DI_CR] = (DI_CR_RW | DI_CR_DMA | DI_CR_TSTART);
+    while (_di_regs[DI_CR] & DI_CR_TSTART) {
+        if (ticks_to_millisecs(gettime()) % 1000 == 0) {
+            OSReport("Still writing: %u/%u\n", (u32)_di_regs[DI_LENGTH], length);
+        }
+    }
+
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
+        return 1;
+    }
+    return 0;
+}
+
 
 static GCN_ALIGNED(file_status_t) status;
 file_status_t *dvd_custom_status() {
@@ -249,18 +273,12 @@ int dvd_custom_readdir(file_entry_t* dst, unsigned int fd) {
     while (_di_regs[DI_CR] & DI_CR_TSTART)
         ; // transfer complete register
 
-    OSReport("dvd_custom_readdir: %s\n", dst->name);
-
     DCInvalidateRange(dst, sizeof(file_entry_t));
-
-    OSReport("dvd_custom_readdir: %s\n", dst->name);
 
     // check if ERR was asserted
 	if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-
-    OSReport("dvd_custom_readdir: %s\n", dst->name);
 
 	return 0;
 }
