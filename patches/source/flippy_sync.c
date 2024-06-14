@@ -40,7 +40,6 @@ extern void DCInvalidateRange(void *startaddress, u32 len);
 #define DVD_OEM_INQUIRY 0x12000000
 #define DVD_OEM_READ 0xA8000000
 #define DVD_FLIPPY_BOOTLOADER_STATUS 0xB4000000
-#define DVD_FLIPPY_BYPASS_MODE 0xDC000000
 #define DVD_FLIPPY_FILEAPI_BASE 0xB5000000
 
 static vu32* const _di_regs = (vu32*)0xCC006000;
@@ -70,18 +69,18 @@ dvd_info_t *dvd_inquiry() {
 // === bootloader commands
 
 int dvd_bootloader_status(firmware_status_blob_t* dst) {
-	_di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
 
-	_di_regs[DI_CMDBUF0] = DVD_FLIPPY_BOOTLOADER_STATUS;
-	_di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0;
+    _di_regs[DI_CMDBUF0] = DVD_FLIPPY_BOOTLOADER_STATUS;
+    _di_regs[DI_CMDBUF1] = 0;
+    _di_regs[DI_CMDBUF2] = 0;
 
-	_di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
+    _di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(firmware_status_blob_t);
     _di_regs[DI_CR] = (DI_CR_DMA | DI_CR_TSTART); // start transfer
 
-	while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
+    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
 
     DCInvalidateRange(dst, sizeof(firmware_status_blob_t));
 
@@ -90,10 +89,10 @@ int dvd_bootloader_status(firmware_status_blob_t* dst) {
     dst->status_sub[63] = 0;
 
     // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-	return 0;
+    return 0;
 }
 
 void dvd_bootloader_boot() {
@@ -150,14 +149,14 @@ void dvd_bootloader_noupdate() {
 // === flippy custom commands
 
 void dvd_custom_close(uint32_t fd) {
-	_di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_CLOSE | ((fd & 0xFF) << 16);
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0;
+    _di_regs[DI_CMDBUF2] = 0;
 
-	_di_regs[DI_MAR] = 0;
+    _di_regs[DI_MAR] = 0;
     _di_regs[DI_LENGTH] = 0;
     _di_regs[DI_CR] = DI_CR_TSTART; // start transfer
 
@@ -165,54 +164,23 @@ void dvd_custom_close(uint32_t fd) {
 }
 
 void dvd_set_default_fd(uint32_t fd) {
-	_di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_SET_DEFAULT_FD | ((fd & 0xFF) << 16);
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0;
+    _di_regs[DI_CMDBUF2] = 0;
 
-	_di_regs[DI_MAR] = 0;
+    _di_regs[DI_MAR] = 0;
     _di_regs[DI_LENGTH] = 0;
     _di_regs[DI_CR] = DI_CR_TSTART; // start transfer
 
     while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
 }
 
-int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
-    if (offset >> 2 > 0xFFFFFFFF) return -1;
-
-    /* TODO What was going on with this setup code previously? Seems wrong
-    if ((((int)dst) & 0xC0000000) == 0x80000000) // cached?
-    {
-        dvd[0] = 0x2E;
-    }
-    */
-    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
-
-    _di_regs[DI_CMDBUF0] = DVD_OEM_READ | ((fd & 0xFF) << 16);
-    _di_regs[DI_CMDBUF1] = offset >> 2;
-	_di_regs[DI_CMDBUF2] = len;
-
-	_di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
-    _di_regs[DI_LENGTH] = len;
-    _di_regs[DI_CR] = (DI_CR_DMA | DI_CR_TSTART); // start transfer
-
-	while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-
-    DCInvalidateRange(dst, len);
-
-    // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
-        return 1;
-    }
-	return 0;
-}
-
 int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd) {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_WRITE | ((fd & 0xFF) << 16);
     _di_regs[DI_CMDBUF1] = offset;
@@ -233,20 +201,51 @@ int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd) {
     return 0;
 }
 
+int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
+
+    if (offset >> 2 > 0xFFFFFFFF) return -1;
+
+    /* TODO What was going on with this setup code previously? Seems wrong
+    if ((((int)dst) & 0xC0000000) == 0x80000000) // cached?
+    {
+        dvd[0] = 0x2E;
+    }
+    */
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
+
+    _di_regs[DI_CMDBUF0] = DVD_OEM_READ | ((fd & 0xFF) << 16);
+    _di_regs[DI_CMDBUF1] = offset >> 2;
+    _di_regs[DI_CMDBUF2] = len;
+
+    _di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
+    _di_regs[DI_LENGTH] = len;
+    _di_regs[DI_CR] = (DI_CR_DMA | DI_CR_TSTART); // start transfer
+
+    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
+
+    DCInvalidateRange(dst, len);
+
+    // check if ERR was asserted
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
+        return 1;
+    }
+    return 0;
+}
 
 static GCN_ALIGNED(file_status_t) status;
 file_status_t *dvd_custom_status() {
     memset(&status, 0, sizeof(file_status_t));
     status.result = 1;
 
-	_di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_READ_STATUS;
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0;
+    _di_regs[DI_CMDBUF2] = 0;
 
-	_di_regs[DI_MAR] = (u32)&status & 0x1FFFFFFF;
+    _di_regs[DI_MAR] = (u32)(&status) & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(file_status_t);
     _di_regs[DI_CR] = (DI_CR_DMA | DI_CR_TSTART); // start transfer
 
@@ -255,18 +254,22 @@ file_status_t *dvd_custom_status() {
 
     DCInvalidateRange(&status, sizeof(file_status_t));
 
-	return &status;
+    // check if ERR was asserted
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
+        return NULL;
+    }
+    return &status;
 }
 
 int dvd_custom_readdir(file_entry_t* dst, unsigned int fd) {
-	_di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_READDIR | ((fd & 0xFF) << 16);
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0;
+    _di_regs[DI_CMDBUF2] = 0;
 
-	_di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
+    _di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(file_entry_t);
     _di_regs[DI_CR] = (DI_CR_DMA | DI_CR_TSTART); // start transfer
 
@@ -276,11 +279,10 @@ int dvd_custom_readdir(file_entry_t* dst, unsigned int fd) {
     DCInvalidateRange(dst, sizeof(file_entry_t));
 
     // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-
-	return 0;
+    return 0;
 }
 
 int dvd_custom_unlink(char *path) {
@@ -291,12 +293,12 @@ int dvd_custom_unlink(char *path) {
 
     DCFlushRange(&entry, sizeof(file_entry_t));
 
-	_di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_UNLINK;
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
+    _di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
 
     _di_regs[DI_MAR] = (u32)&entry & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(file_entry_t);
@@ -306,10 +308,10 @@ int dvd_custom_unlink(char *path) {
         ; // transfer complete register
 
     // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-	return 0;
+    return 0;
 }
 
 int dvd_custom_unlink_flash(char *path) {
@@ -321,11 +323,11 @@ int dvd_custom_unlink_flash(char *path) {
     DCFlushRange(&entry, sizeof(file_entry_t));
 
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_UNLINK_FLASH;
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
+    _di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
 
     _di_regs[DI_MAR] = (u32)&entry & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(file_entry_t);
@@ -335,10 +337,10 @@ int dvd_custom_unlink_flash(char *path) {
         ; // transfer complete register
 
     // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-	return 0;
+    return 0;
 }
 
 int dvd_custom_open(char *path, uint8_t type, uint8_t flags) {
@@ -352,13 +354,13 @@ int dvd_custom_open(char *path, uint8_t type, uint8_t flags) {
     DCFlushRange(&entry, sizeof(file_entry_t));
 
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_OPEN;
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
+    _di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
 
-	_di_regs[DI_MAR] = (u32)&entry & 0x1FFFFFFF;
+    _di_regs[DI_MAR] = (u32)&entry & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(file_entry_t);
     _di_regs[DI_CR] = (DI_CR_RW | DI_CR_DMA | DI_CR_TSTART); // start transfer
 
@@ -366,29 +368,30 @@ int dvd_custom_open(char *path, uint8_t type, uint8_t flags) {
         ; // transfer complete register
 
     // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-	return 0;
+    return 0;
 }
 
-int dvd_custom_open_flash(char *path, uint8_t type) {
+int dvd_custom_open_flash(char *path, uint8_t type, uint8_t flags) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);
     entry.name[255] = 0;
     entry.type = type;
+    entry.flags = flags;
 
     DCFlushRange(&entry, sizeof(file_entry_t));
 
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-	_di_regs[DI_CVR] = 0; // clear cover int
+    _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_FILE_OPEN_FLASH;
     _di_regs[DI_CMDBUF1] = 0;
-	_di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
+    _di_regs[DI_CMDBUF2] = 0; //TODO this was sizeof(file_entry_t) before for no particular reason
 
-	_di_regs[DI_MAR] = (u32)&entry & 0x1FFFFFFF;
+    _di_regs[DI_MAR] = (u32)&entry & 0x1FFFFFFF;
     _di_regs[DI_LENGTH] = sizeof(file_entry_t);
     _di_regs[DI_CR] = (DI_CR_RW | DI_CR_DMA | DI_CR_TSTART); // start transfer
 
@@ -396,17 +399,17 @@ int dvd_custom_open_flash(char *path, uint8_t type) {
         ; // transfer complete register
 
     // check if ERR was asserted
-	if (_di_regs[DI_SR] & DI_SR_DEINT) {
+    if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
-	return 0;
+    return 0;
 }
 
 void dvd_custom_bypass() {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
-    _di_regs[DI_CMDBUF0] = DVD_FLIPPY_BYPASS_MODE;
+    _di_regs[DI_CMDBUF0] = 0xDC000000;
     _di_regs[DI_CMDBUF1] = 0;
     _di_regs[DI_CMDBUF2] = 0;
 

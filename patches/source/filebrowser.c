@@ -420,26 +420,6 @@ void *file_enum_worker(void* param) {
     return NULL;
 }
 
-void file_test() {
-    int ret = dvd_custom_open("test.txt", FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_WRITE | IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
-    if (ret != 0) {
-        OSReport("Could not open test.txt\n");
-        return;
-    }
-
-    file_status_t *status = dvd_custom_status();
-    if (status->result != 0) {
-        OSReport("Could not open test.txt\n");
-        return;
-    }
-
-    char *test_data = "Hello, World!";
-    dvd_custom_write(test_data, strlen(test_data), 0, status->fd);
-    dvd_custom_close(status->fd);
-
-    OSReport("Wrote test.txt\n");
-}
-
 // match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
 static u8 thread_obj[0x310];
 static u8 thread_stack[32 * 1024];
