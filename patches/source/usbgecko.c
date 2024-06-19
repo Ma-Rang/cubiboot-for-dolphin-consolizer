@@ -27,10 +27,9 @@
 
 #include "config.h"
 
-#ifndef USE_NATIVE_SPRINTF
-#define TINYPRINTF_OVERRIDE_LIBC 1
-#include "tinyprintf/tinyprintf.h"
-#endif
+// #ifndef USE_NATIVE_SPRINTF
+// #include "pico.h"
+// #endif
 
 #ifdef DOLPHIN_PRINT_ENABLE
 

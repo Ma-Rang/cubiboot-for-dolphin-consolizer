@@ -22,3 +22,5 @@ typedef struct {
 } DOLHEADER;
 
 #pragma pack(pop)
+
+u32 DOLMax(DOLHEADER * dol);

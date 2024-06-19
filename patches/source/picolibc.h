@@ -1,10 +1,26 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include "config.h"
+
+#ifndef USE_NATIVE_SPRINTF
+int rpl_vsnprintf(char *, size_t, const char *, va_list);
+int rpl_snprintf(char *, size_t, const char *, ...);
+int rpl_vasprintf(char **, const char *, va_list);
+int rpl_asprintf(char **, const char *, ...);
+
+#define vsnprintf rpl_vsnprintf
+#define snprintf rpl_snprintf
+#define vasprintf rpl_vasprintf
+#define asprintf rpl_asprintf
+#define sprintf(dst, fmt, ...) snprintf(dst, 0xFFFFFFFF, fmt, ##__VA_ARGS__)
+#else
 int vsnprintf(char* s, size_t n, const char* format, va_list arg);
 int vsprintf(char* s, const char* format, va_list arg);
 int snprintf(char* s, size_t n, const char* format, ...);
 int sprintf(char* s, const char* format, ...);
+
+#endif
 
 void *memmove(void *dst, const void *src, size_t length);
 void *memcpy(void* dst, const void* src, size_t count);

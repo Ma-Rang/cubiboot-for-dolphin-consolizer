@@ -229,34 +229,6 @@ inline void Metaphrasis_convertBufferToRGBA8(void* rgbaBuffer, void* dataBufferR
 	return;
 }
 
-static inline void *ppc_link_register(void)
-{
-  void *lr;
-
-  __asm__ volatile (
-    "mflr %0"
-    : "=r" (lr)
-  );
-
-  return lr;
-}
-
-static inline void ppc_set_link_register(void *lr)
-{
-  __asm__ volatile (
-    "mtlr %0"
-    :
-    : "r" (lr)
-  );
-}
-
-static inline void __eieio(void)
-{
-  __asm__ volatile (
-    "eieio"
-  );
-}
-
 // from Nintendont
 static inline void iwrite32(u32 addr, u32 x) {
 	asm volatile("stw %0,0(%1) ; eieio" : : "r"(x), "b"(0x40000000 | addr));
