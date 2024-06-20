@@ -302,8 +302,10 @@ void *file_enum_worker(void* param) {
         OSYieldThread();
 
         file_status_t *status = dvd_custom_status();
-        // TODO: check error
-        // if (status->result != 0) {...}
+        if (status == NULL || status->result != 0) {
+            OSReport("ERROR: could not open file\n");
+            continue;
+        }
 
         if (game_backing->is_dol) {
             OSReport("DOL loaded: %s\n", game_backing->iso_path);

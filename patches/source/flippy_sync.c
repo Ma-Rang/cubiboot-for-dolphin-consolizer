@@ -235,9 +235,6 @@ int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
 
 static GCN_ALIGNED(file_status_t) status;
 file_status_t *dvd_custom_status() {
-    memset(&status, 0, sizeof(file_status_t));
-    status.result = 1;
-
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
