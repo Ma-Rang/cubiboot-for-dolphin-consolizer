@@ -435,6 +435,12 @@ __attribute_used__ void bs2start() {
     DCFlushRange((void*)start_addr, len);
     ICInvalidateRange((void*)start_addr, len);
 
+    // read boot info into lowmem
+    struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
+    lowmem->a_boot_magic = 0x0D15EA5E;
+    lowmem->a_version = 0x00000001;
+    lowmem->b_physical_memory_size = 0x01800000;
+
     bool boot_iso_file = false;
 
     // only load the apploader if the boot path is not a .dol file
@@ -448,12 +454,8 @@ __attribute_used__ void bs2start() {
     } else {
         custom_OSReport("Booting ISO (chainload)\n");
 
-        // int ret = dvd_custom_open(IPC_DEVICE_FLASH, boot_path, FILE_ENTRY_TYPE_FILE, 0);
-        // custom_OSReport("OPEN ret: %08x\n", ret);
-        // (void)ret;
-
         // TODO: switch to flash
-        int ret = dvd_custom_open("/chainload.dol", FILE_ENTRY_TYPE_FILE, 0);
+        int ret = dvd_custom_open("/swiss.dol", FILE_ENTRY_TYPE_FILE, 0);
         custom_OSReport("OPEN ret: %08x\n", ret);
         (void)ret;
 
@@ -494,19 +496,38 @@ __attribute_used__ void bs2start() {
         char *argz = (void*)DOLMax(hdr) + 32;
         int argz_len = 0;
 
-        const char *arg0 = "cubeboot.dol";
-        int arg0_len = strlen(arg0) + 1;
-        memcpy(argz + argz_len, arg0, arg0_len);
-        argz_len += arg0_len;
+        const char *arg0 = "swiss-novideo.dol";
 
-        int arg1_len = strlen(boot_path) + 1;
-        memcpy(argz + argz_len, boot_path, arg1_len);
-        argz_len += arg1_len;
+        char autoload_arg[256];
+        strcpy(autoload_arg, "Autoload=fldr:");
+        strcat(autoload_arg, boot_path);
+
+        const char *arg_list[] = {
+            arg0,
+            autoload_arg,
+            "AutoBoot=Yes",
+            "IGRType=Reboot",
+            "BS2Boot=No",
+            "Prefer Clean Boot=No",
+            NULL
+        };
+
+        int arg_count = 0;
+        while(arg_list[arg_count] != NULL) {
+            const char *arg = arg_list[arg_count];
+            int arg_len = strlen(arg) + 1;
+            memcpy(argz + argz_len, arg, arg_len);
+            argz_len += arg_len;
+            arg_count++;
+        }
 
         struct __argv *args = (void*)(prog_entrypoint + 8);
         args->argvMagic = ARGV_MAGIC;
         args->commandLine = argz;
         args->length = argz_len;
+
+        DCFlushRange(argz, argz_len);
+        DCFlushRange(args, sizeof(struct __argv));
     }
 
     // TODO: copy a DCZeroRange routine to 0x81200000 instead (like sidestep)
