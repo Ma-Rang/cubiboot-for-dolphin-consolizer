@@ -41,6 +41,7 @@ dol_info_t load_dol(char *path, bool flash) {
     }
 
     custom_OSReport("Copy done...\n");
+    dvd_custom_close(file_status->fd);
 
     // Clear BSS
     // TODO: check if this overlaps with IPL
@@ -59,20 +60,29 @@ void chainload_boot_game(char *boot_path) {
     lowmem->a_version = 0x00000001;
     lowmem->b_physical_memory_size = 0x01800000;
 
+    // open file
+    dvd_custom_open(boot_path, FILE_ENTRY_TYPE_FILE, 0);
+    file_status_t *file_status = dvd_custom_status();
+    if (file_status == NULL || file_status->result != 0) {
+        custom_OSReport("Failed to open file %s\n", boot_path);
+        return;
+    }
+
+    dvd_set_default_fd(file_status->fd);
     dvd_read(&lowmem->b_disk_info, 0x20, 0, 0);
 
     void *entrypoint = load_apploader();
 
     struct gcm_disk_header_info *bi2 = lowmem->a_bi2;
 
-    OSReport("BI2: %08x\n", bi2);
-    OSReport("Country: %x\n", bi2->country_code);
+    custom_OSReport("BI2: %08x\n", bi2);
+    custom_OSReport("Country: %x\n", bi2->country_code);
 
     // game id
-    OSReport("Game ID: %c%c%c%c\n", lowmem->b_disk_info.game_code[0], lowmem->b_disk_info.game_code[1], lowmem->b_disk_info.game_code[2], lowmem->b_disk_info.game_code[3]);
+    custom_OSReport("Game ID: %c%c%c%c\n", lowmem->b_disk_info.game_code[0], lowmem->b_disk_info.game_code[1], lowmem->b_disk_info.game_code[2], lowmem->b_disk_info.game_code[3]);
 
     if (bi2->country_code == COUNTRY_EUR) {
-        OSReport("PAL game detected\n");
+        custom_OSReport("PAL game detected\n");
         ogc__VIInit(VI_TVMODE_PAL_INT);
 
         // set video mode PAL
@@ -83,7 +93,7 @@ void chainload_boot_game(char *boot_path) {
             lowmem->tv_mode = 1;
         }
     } else {
-        OSReport("NTSC game detected\n");
+        custom_OSReport("NTSC game detected\n");
         ogc__VIInit(VI_TVMODE_NTSC_INT);
 
         lowmem->tv_mode = 0;
@@ -118,12 +128,12 @@ void* load_apploader() {
     // start disc drive & read apploader
     err = dvd_read(buffer,0x20,0x2440, 0);
     if (err) {
-        OSReport("Could not load apploader header\n");
+        custom_OSReport("Could not load apploader header\n");
         while(1);
     }
     err = dvd_read((void*)0x81200000,((*(unsigned long*)((u32)buffer+0x14)) + 31) &~31,0x2460, 0);
     if (err) {
-        OSReport("Could not load apploader data\n");
+        custom_OSReport("Could not load apploader data\n");
         while(1);
     }
 

@@ -441,6 +441,7 @@ __attribute_used__ void bs2start() {
     lowmem->b_physical_memory_size = 0x01800000;
 
     // TODO: use the filebrowser to get the game path
+    chainload_boot_game(boot_path);
 
     // only load the apploader if the boot path is not a .dol file
     extern int strncmpci(const char * str1, const char * str2, size_t num);
