@@ -31,10 +31,10 @@
 
 #define TEST_ONLY_force_boot_menu 1
 
-__attribute_data__ u32 prog_entrypoint;
-__attribute_data__ u32 prog_dst;
-__attribute_data__ u32 prog_src;
-__attribute_data__ u32 prog_len;
+// __attribute_data__ u32 prog_entrypoint;
+// __attribute_data__ u32 prog_dst;
+// __attribute_data__ u32 prog_src;
+// __attribute_data__ u32 prog_len;
 
 __attribute_data__ u32 cube_color = 0;
 __attribute_data__ u32 start_game = 0;
@@ -326,8 +326,8 @@ __attribute_used__ void pre_main() {
     //     cube_color = 0x4A412A; // or 0x0000FF
     // }
 
-    OSReport("LOADCMD %x, %x, %x, %x\n", prog_entrypoint, prog_dst, prog_src, prog_len);
-    memmove((void*)prog_dst, (void*)prog_src, prog_len);
+    // OSReport("LOADCMD %x, %x, %x, %x\n", prog_entrypoint, prog_dst, prog_src, prog_len);
+    // memmove((void*)prog_dst, (void*)prog_src, prog_len);
 
     main();
 
@@ -463,6 +463,7 @@ __attribute_used__ void bs2start() {
             custom_OSReport("Booting ISO (swiss chainload)\n");
 
             dol_info_t info = load_dol("/swiss-gc.dol", true);
+
             char *argz = (void*)info.max_addr + 32;
             int argz_len = 0;
 
@@ -489,7 +490,7 @@ __attribute_used__ void bs2start() {
                 arg_count++;
             }
 
-            struct __argv *args = (void*)(prog_entrypoint + 8);
+            struct __argv *args = (void*)(info.entrypoint + 8);
             args->argvMagic = ARGV_MAGIC;
             args->commandLine = argz;
             args->length = argz_len;
@@ -499,7 +500,7 @@ __attribute_used__ void bs2start() {
 
             run(info.entrypoint);
         } else {
-            custom_OSReport("Booting ISO (swiss apploader)\n");
+            custom_OSReport("Booting ISO (custom apploader)\n");
             chainload_boot_game(boot_path);
         }
     }

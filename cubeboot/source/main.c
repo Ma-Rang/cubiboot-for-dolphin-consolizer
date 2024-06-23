@@ -48,7 +48,7 @@ typedef struct {
     char path[128];
 } game_asset;
 
-static u32 prog_entrypoint, prog_dst, prog_src, prog_len;
+// static u32 prog_entrypoint, prog_dst, prog_src, prog_len;
 
 #define BS2_BASE_ADDR 0x81300000
 static void (*bs2entry)(void) = (void(*)(void))BS2_BASE_ADDR;
@@ -391,19 +391,19 @@ int main() {
         iprintf("img can be found at %08x\n", (u32)image_data);
     }
 
-    // load current program
-    prog_entrypoint = (u32)&_start;
-    prog_src = (u32)current_dol_buf;
-    prog_dst = (u32)&_start; // (u32*)0x80600000;
-    prog_len = current_dol_len;
+    // // load current program
+    // prog_entrypoint = (u32)&_start;
+    // prog_src = (u32)current_dol_buf;
+    // prog_dst = (u32)&_start; // (u32*)0x80600000;
+    // prog_len = current_dol_len;
 
-    iprintf("Current program start = %08x\n", prog_entrypoint);
+    // iprintf("Current program start = %08x\n", prog_entrypoint);
 
-    // Copy program metadata into place
-    set_patch_value(symshdr, syment, symstringdata, "prog_entrypoint", prog_entrypoint);
-    set_patch_value(symshdr, syment, symstringdata, "prog_src", prog_src);
-    set_patch_value(symshdr, syment, symstringdata, "prog_dst", prog_dst);
-    set_patch_value(symshdr, syment, symstringdata, "prog_len", prog_len);
+    // // Copy program metadata into place
+    // set_patch_value(symshdr, syment, symstringdata, "prog_entrypoint", prog_entrypoint);
+    // set_patch_value(symshdr, syment, symstringdata, "prog_src", prog_src);
+    // set_patch_value(symshdr, syment, symstringdata, "prog_dst", prog_dst);
+    // set_patch_value(symshdr, syment, symstringdata, "prog_len", prog_len);
 
     // Copy settings into place
     set_patch_value(symshdr, syment, symstringdata, "start_game", can_load_dol);
