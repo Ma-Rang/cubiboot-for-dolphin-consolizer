@@ -456,7 +456,7 @@ __attribute_used__ void bs2start() {
 
         prepare_game_lowmem(boot_path);
         char *game_code = lowmem->b_disk_info.game_code;
-        bool is_tonyhawk_proskater4 = (game_code[0] == 'G' && game_code[0] == 'T' && game_code[0] == '4');
+        bool is_tonyhawk_proskater4 = (game_code[0] == 'G' && game_code[1] == 'T' && game_code[2] == '4');
         bool use_swiss = is_tonyhawk_proskater4 || force_swiss_boot;
 
         if (use_swiss) {
