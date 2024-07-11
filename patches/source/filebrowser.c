@@ -373,6 +373,7 @@ void *file_enum_worker(void* param) {
 #ifdef PRINT_READDIR_FILES
             OSReport("FSTSize = 0x%08x\n", game_backing->fst_size);
 #endif
+            // TODO: get_gcm_banner_fast
             __DVDFSInit_threaded(status->fd, game_backing);
             if (game_backing->dvd_bnr_offset == 0) {
                 OSReport("No opening.bnr found, skipping\n");
@@ -447,7 +448,7 @@ void *file_enum_worker(void* param) {
     OSReport("Second file enum completed! took=%f (%d)\n", runtime, game_backing_count);
     (void)runtime;
 
-    OSReport("[DONE] - KILL DOLPHIN NOW\n");
+    // OSReport("[DONE] - KILL DOLPHIN NOW\n");
     return NULL;
 }
 

@@ -21,7 +21,9 @@ void load_stub() {
     file_size += 31;
     file_size &= 0xffffffe0;
 
-    dvd_read((void*)0x80001800, file_size, 0, file_status->fd);
+    dvd_read((void*)STUB_ADDR, file_size, 0, file_status->fd);
+    ICInvalidateRange((void*)STUB_ADDR, file_size);
+
     dvd_custom_close(file_status->fd);
     return;
 }
@@ -85,24 +87,26 @@ void prepare_game_lowmem(char *boot_path) {
     dvd_custom_close(file_status->fd);
 }
 
-void chainload_boot_game(char *boot_path) {
+void chainload_boot_game(char *boot_path, bool passthrough) {
     // read boot info into lowmem
     struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
     lowmem->a_boot_magic = 0x0D15EA5E;
     lowmem->a_version = 0x00000001;
     lowmem->b_physical_memory_size = 0x01800000;
 
-    // open file
-    dvd_custom_open(boot_path, FILE_ENTRY_TYPE_FILE, 0);
-    file_status_t *file_status = dvd_custom_status();
-    if (file_status == NULL || file_status->result != 0) {
-        custom_OSReport("Failed to open file %s\n", boot_path);
-        return;
+    if (!passthrough) {
+        // open file
+        dvd_custom_open(boot_path, FILE_ENTRY_TYPE_FILE, 0);
+        file_status_t *file_status = dvd_custom_status();
+        if (file_status == NULL || file_status->result != 0) {
+            custom_OSReport("Failed to open file %s\n", boot_path);
+            return;
+        }
+
+        dvd_set_default_fd(file_status->fd);
     }
 
-    dvd_set_default_fd(file_status->fd);
     dvd_read(&lowmem->b_disk_info, 0x20, 0, 0);
-
     void *entrypoint = load_apploader();
 
     struct gcm_disk_header_info *bi2 = lowmem->a_bi2;

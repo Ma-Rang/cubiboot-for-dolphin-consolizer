@@ -41,14 +41,7 @@
 
 #include "flippy_sync.h"
 
-typedef struct {
-    struct gcm_disk_header header;
-    BNR banner;
-    // u8 icon_rgb5[64*64*2];
-    char path[128];
-} game_asset;
-
-// static u32 prog_entrypoint, prog_dst, prog_src, prog_len;
+#define STUB_ADDR 0x80001800
 
 #define BS2_BASE_ADDR 0x81300000
 static void (*bs2entry)(void) = (void(*)(void))BS2_BASE_ADDR;
@@ -75,7 +68,7 @@ void __SYS_PreInit() {
     // memcpy(current_dol_buf, &_start, current_dol_len);
 }
 
-int main() {
+int main(int argc, char **argv) {
     u64 startts, endts;
 
     startts = ticks_to_millisecs(gettime());
@@ -153,7 +146,18 @@ int main() {
 #ifdef VIDEO_ENABLE
     iprintf("XFB = %08x [max=%x]\n", (u32)xfb, VIDEO_GetFrameBufferSize(&TVPal576ProgScale));
 #endif
-    iprintf("current_dol_len = %d\n", current_dol_len);
+
+    // setup passthrough arg
+    u32 force_passthrough = 0;
+    if (argc > 1 && strcmp(argv[1], "passthrough") == 0) {
+        force_passthrough = 1;
+    }
+
+    if (*(u32*)STUB_ADDR == 0x50415353) {
+        force_passthrough = 1;
+    }
+
+    iprintf("force_passthrough = %d\n", force_passthrough);
 
 #if 0
     // setup config device
@@ -169,98 +173,10 @@ int main() {
     if (check_load_program()) {
         can_load_dol = true;
     }
-#elif 0
-    // dvd setup
-    // DVDInit();
-
-    // fake settings
-    {
-        memset(&settings, 0, sizeof(settings));
-
-        // cube color
-        // settings.cube_color = 0x660089;
-        settings.cube_color = 0; // default
-
-        // cube logo
-        settings.cube_logo = NULL;
-
-        // default program
-        settings.default_program = NULL;
-
-        // fallback enable
-        settings.fallback_enabled = 0;
-
-        // progressive enable
-        // GXRModeObj *temp = VIDEO_GetPreferredMode(NULL);
-        // settings.progressive_enabled = (temp->viTVMode & 3) == VI_PROGRESSIVE ? 1 : 0;
-        // iprintf("Detected progressive: %d\n", settings.progressive_enabled);
-        // settings.progressive_enabled = 1;
-        settings.progressive_enabled = 0;
-
-        // preboot delay
-        settings.preboot_delay_ms = 0;
-
-        // postboot delay
-        settings.postboot_delay_ms = 0;
-    }
 #else
     // setup settings
     iprintf("Loading settings\n");
     load_settings();
-#endif
-
-#if 0
-    iprintf("Checkup, done=%08x\n", state->boot_code);
-    if (state->boot_code == 0xCAFEBEEF) {
-        iprintf("He's alive! The doc's alive! He's in the old west, but he's alive!!\n");
-
-#ifdef VIDEO_ENABLE
-        VIDEO_WaitVSync();
-#endif
-
-        // check for a held button
-        int held_max_index = -1;
-        u64 held_current_max = 0;
-        for (int i = 0; i < MAX_BUTTONS; i++) {
-            if (state->held_buttons[i].status == 0) continue;
-
-            u64 ts = state->held_buttons[i].timestamp;
-            u32 ms = ticks_to_millisecs(ts);
-
-            if (ms > held_current_max) {
-                held_max_index = i;
-                held_current_max = ms;
-            }
-
-            iprintf("HELD: %s\n", buttons_names[i]);
-        }
-
-        // only boot when held > 300ms
-        if (held_current_max < 300) {
-            held_max_index = -1;
-        }
-
-        if (held_max_index != -1) {
-            char *button_name = buttons_names[held_max_index];
-            iprintf("MAX HELD: %s\n", button_name);
-            char buf[64];
-
-            char *filename = settings.boot_buttons[held_max_index];
-            if (filename == NULL) {
-                filename = &buf[0];
-                strcpy(filename, button_name);
-                strcat(filename, ".dol");
-            }
-
-            if (*button_name == '_') {
-                filename = NULL;
-            }
-
-            boot_program(filename);
-        } else {
-            boot_program(NULL);
-        }
-    }
 #endif
 
 //// fun stuff
@@ -384,12 +300,12 @@ int main() {
         prog_halt("Failed BIOS Patching relocation\n");
     }
 
-    // local vars
-    u8 *image_data = NULL;
-    if (settings.cube_logo != NULL) {
-        image_data = load_logo_texture(settings.cube_logo);
-        iprintf("img can be found at %08x\n", (u32)image_data);
-    }
+    // // local vars
+    // u8 *image_data = NULL;
+    // if (settings.cube_logo != NULL && strlen(settings.cube_logo) > 0) {
+    //     image_data = load_logo_texture(settings.cube_logo);
+    //     iprintf("img can be found at %08x\n", (u32)image_data);
+    // }
 
     // // load current program
     // prog_entrypoint = (u32)&_start;
@@ -406,9 +322,9 @@ int main() {
     // set_patch_value(symshdr, syment, symstringdata, "prog_len", prog_len);
 
     // Copy settings into place
-    // set_patch_value(symshdr, syment, symstringdata, "start_game", can_load_dol);
+    set_patch_value(symshdr, syment, symstringdata, "start_passthrough_game", force_passthrough);
     set_patch_value(symshdr, syment, symstringdata, "cube_color", settings.cube_color);
-    set_patch_value(symshdr, syment, symstringdata, "cube_text_tex", (u32)image_data);
+    // set_patch_value(symshdr, syment, symstringdata, "cube_text_tex", (u32)image_data);
     set_patch_value(symshdr, syment, symstringdata, "force_progressive", settings.progressive_enabled);
     set_patch_value(symshdr, syment, symstringdata, "force_swiss_boot", settings.force_swiss_default);
 

@@ -241,7 +241,7 @@ int dvd_read_data(void* dst, unsigned int len, uint64_t offset, unsigned int fd)
 
     if(((uint32_t)dst & 0x1F) || (len & 0x1F) || (offset & 0x3)) //Buffer, length, or offset is not aligned
     {
-        GCN_ALIGNED(u8) aligned_buffer[FD_IPC_MAXRESP];
+        static GCN_ALIGNED(u8) aligned_buffer[FD_IPC_MAXRESP];
 
         while (remaining > 0)
         {

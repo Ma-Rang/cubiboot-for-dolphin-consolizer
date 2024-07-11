@@ -47,7 +47,7 @@ int iprintf(const char *fmt, ...) {
     va_start(args, fmt);
     // length = vsprintf(line, fmt, args);
     // length = sprintf(buf, "(%f): %s", (f32)diff_usec(first_print, gettime()) / 1000.0, line);
-    length = vsprintf(buf, fmt, args);
+    length = vsnprintf(buf, sizeof(buf), fmt, args);
 
     write(2, buf, length);
 

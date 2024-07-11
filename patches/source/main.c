@@ -16,6 +16,7 @@
 
 #include "flippy_sync.h"
 #include "filebrowser.h"
+#include "gc_dvd.h"
 
 #include "video.h"
 #include "dol.h"
@@ -29,15 +30,13 @@
 #define STATE_NO_DISC    0x12 // play full animation before menu
 #define STATE_COVER_OPEN 0x13 // force direct to menu
 
-#define TEST_ONLY_force_boot_menu 1
-
 // __attribute_data__ u32 prog_entrypoint;
 // __attribute_data__ u32 prog_dst;
 // __attribute_data__ u32 prog_src;
 // __attribute_data__ u32 prog_len;
 
 __attribute_data__ u32 cube_color = 0;
-// __attribute_data__ u32 start_game = 0;
+__attribute_data__ u32 start_passthrough_game = 0;
 
 __attribute_data__ u8 *cube_text_tex = NULL;
 __attribute_data__ u32 force_progressive = 0;
@@ -366,22 +365,22 @@ __attribute_used__ u32 bs2tick() {
         completed_time = gettime();
     }
 
+    if (start_passthrough_game) {
+        if (postboot_delay_ms) {
+            u64 elapsed = diff_msec(completed_time, gettime());
+            if (completed_time > 0 && elapsed > postboot_delay_ms) {
+                return STATE_START_GAME;
+            } else {
+                return STATE_WAIT_LOAD;
+            }
+        }
+        return STATE_START_GAME;
+    }
+
     // this helps the start menu show correctly
     if (*main_menu_id >= 3) {
         return STATE_START_GAME;
     }
-
-    // if (start_game && !TEST_ONLY_force_boot_menu) {
-    //     if (postboot_delay_ms) {
-    //         u64 elapsed = diff_msec(completed_time, gettime());
-    //         if (completed_time > 0 && elapsed > postboot_delay_ms) {
-    //             return STATE_START_GAME;
-    //         } else {
-    //             return STATE_WAIT_LOAD;
-    //         }
-    //     }
-    //     return STATE_START_GAME;
-    // }
 
 #ifdef TEST_SKIP_ANIMATION
         return STATE_COVER_OPEN;
@@ -440,6 +439,29 @@ __attribute_used__ void bs2start() {
     lowmem->a_boot_magic = 0x0D15EA5E;
     lowmem->a_version = 0x00000001;
     lowmem->b_physical_memory_size = 0x01800000;
+
+    // Passthrough mode
+    if (start_passthrough_game) {
+        dvd_custom_bypass_enter();
+        udelay(10 * 1000);
+
+        int ret = dvd_read_id();
+        int err = dvd_get_error();
+        if (ret != 0 || err != 0) {
+            custom_OSReport("Failed to read disc ID\n");
+            dvd_custom_bypass_exit();
+            udelay(10 * 1000);
+
+            load_stub(); // exit to loader again
+            u32 *sig = (u32*)0x80001804;
+            if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
+                static void (*reload)(void) = (void(*)(void))0x80001800;
+                run(reload);
+            }
+        }
+
+        chainload_boot_game(NULL, true);
+    }
 
     // TODO: use the filebrowser to get the game path
     // only load the apploader if the boot path is not a .dol file
@@ -502,7 +524,7 @@ __attribute_used__ void bs2start() {
             run(info.entrypoint);
         } else {
             custom_OSReport("Booting ISO (custom apploader)\n");
-            chainload_boot_game(boot_path);
+            chainload_boot_game(boot_path, false);
         }
     }
 

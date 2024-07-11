@@ -51,6 +51,7 @@ int dvd_custom_unlink(char *path);
 int dvd_custom_unlink_flash(char *path);
 int dvd_custom_open(char *path, uint8_t type, uint8_t flags);
 int dvd_custom_open_flash(char *path, uint8_t type, uint8_t flags);
-void dvd_custom_bypass();
+void dvd_custom_bypass_enter();
+void dvd_custom_bypass_exit();
 
 int dvd_custom_presence(bool playing, const char *status, const char* sub_status);

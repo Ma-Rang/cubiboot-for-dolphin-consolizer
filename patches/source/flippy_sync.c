@@ -402,13 +402,31 @@ int dvd_custom_open_flash(char *path, uint8_t type, uint8_t flags) {
     return 0;
 }
 
-void dvd_custom_bypass() {
+void dvd_custom_bypass_enter() {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
     _di_regs[DI_CMDBUF0] = 0xDC000000;
     _di_regs[DI_CMDBUF1] = 0;
     _di_regs[DI_CMDBUF2] = 0;
+
+    _di_regs[DI_MAR] = 0;
+    _di_regs[DI_LENGTH] = 0;
+    _di_regs[DI_CR] = DI_CR_TSTART;
+
+    while (_di_regs[DI_CR] & DI_CR_TSTART)
+        ; // transfer complete register
+
+    return;
+}
+
+void dvd_custom_bypass_exit() {
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
+
+    _di_regs[DI_CMDBUF0] = 0xDC000000;
+    _di_regs[DI_CMDBUF1] = FD_BYPASS_EXIT_MAGIC0;
+    _di_regs[DI_CMDBUF2] = FD_BYPASS_EXIT_MAGIC1;
 
     _di_regs[DI_MAR] = 0;
     _di_regs[DI_LENGTH] = 0;
