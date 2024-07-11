@@ -256,7 +256,9 @@ __attribute_used__ void mod_cube_anim() {
 
 __attribute_used__ void pre_thread_init() {
     orig_thread_init();
-    start_file_enum();
+    if (!start_passthrough_game) {
+        start_file_enum();
+    }
 }
 
 __attribute_used__ void pre_menu_init(int unk) {
@@ -399,11 +401,13 @@ extern char boot_path[];
 __attribute_used__ void bs2start() {
     OSReport("DONE\n");
 
-    OSReport("Waiting for file enum\n");
-    OSLockMutex(game_enum_mutex);
-    OSYieldThread();
-    udelay(100 * 1000); // probably overkill??
-    OSYieldThread();
+    if (!start_passthrough_game) {
+        OSReport("Waiting for file enum\n");
+        OSLockMutex(game_enum_mutex);
+        OSYieldThread();
+        udelay(100 * 1000); // probably overkill??
+        OSYieldThread();
+    }
 
     // memcpy(global_state, &local_state, sizeof(cubeboot_state));
     // global_state->boot_code = 0xCAFEBEEF;
