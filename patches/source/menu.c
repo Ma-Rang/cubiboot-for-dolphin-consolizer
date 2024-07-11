@@ -755,6 +755,6 @@ void alpha_watermark(void) {
     prep_text_mode();
 
     GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
-    draw_text("ALPHA TEST", 24, 330, 0, &yellow_alpha);
-    draw_text("cubeboot rc" CONFIG_ALPHA_RC, 22, 330, 28, &yellow_alpha);
+    draw_text("BETA TEST", 24, 330, 0, &yellow_alpha);
+    draw_text("cubeboot rc" CONFIG_BETA_RC, 22, 330, 28, &yellow_alpha);
 }
