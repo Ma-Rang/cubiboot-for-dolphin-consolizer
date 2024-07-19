@@ -262,8 +262,8 @@ typedef struct box_draw_metadata {
     u16 inside_center_y;
     u16 inside_width;
     u16 inside_height;
-    u16 boarder_index[4];
-    u8 boarder_unk[4];
+    u16 border_index[4];
+    u8 border_unk[4];
     GXColor top_color[2];
     GXColor bottom_color[2];
 } box_draw_metadata;

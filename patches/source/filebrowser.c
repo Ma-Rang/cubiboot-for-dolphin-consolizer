@@ -19,8 +19,10 @@
 
 #include "flippy_sync.h"
 #include "dvd_threaded.h"
+#include "gc_dvd.h"
 
 #include "../../cubeboot/include/bnr.h"
+// #include "lz4.h"
 
 #define SD_TARGET_PATH "/"
 #define DEFAULT_THREAD_PRIO 0x10
@@ -53,12 +55,16 @@ int cmp_iso_path(const void* ptr_a, const void* ptr_b){
 }
 
 int game_backing_count = 0;
-game_backing_entry_t raw_game_backing_list[1000];
-game_backing_entry_t *sorted_raw_game_backing_list[1000];
-game_backing_entry_t *game_backing_list[1000];
+game_backing_entry_t raw_game_backing_list[2000];
+game_backing_entry_t *sorted_raw_game_backing_list[2000];
+game_backing_entry_t *game_backing_list[2000];
 
 // bnr buffers for each game
 static game_asset_t (*game_assets)[512] = (void*)0x80100000; // needs 4mb usable
+// static u8 compression_buffer[0x2000];
+
+int total_banner_size = 0;
+int total_compressed_size = 0;
 
 // draw variables
 int number_of_lines = 0;
@@ -140,16 +146,21 @@ void __DVDFSInit_threaded(uint32_t fd, game_backing_entry_t *backing) {
     entry_table = (FSTEntry*)fst;
     total_entries = entry_table[0].len;
     string_table = (char*)&(entry_table[total_entries]);
+    if ((u32)string_table < 0x81700000 || (u32)string_table > 0x81800000) {
+        OSReport("String table is out of bounds: %08x\n", (u32)string_table);
+        return;
+    }
 
 #ifdef PRINT_READDIR_FILES
     OSReport("FST contains %u\n", total_entries);
-#endif
     OSYieldThread();
+#endif
 
     FSTEntry* p = entry_table;
     for (u32 i = 1; i < total_entries; ++i) { //Start @ 1 to skip FST header
         u32 string_offset = GET_OFFSET(p[i].offset);
         char *string = (char*)((u32)string_table + string_offset);
+        // OSReport("String table = %08x, String offset = %08x\n", (u32)string_table, string_offset);
         // OSReport("FST (0x%08x) entry: %s\n", FILE_POSITION(i), string);
         if (entry_table[i].filetype == T_FILE && strncmpci(string, "opening.bnr", strlen("opening.bnr")) == 0) {
 #ifdef PRINT_READDIR_FILES
@@ -253,8 +264,10 @@ static int early_file_enum() {
         strcat(game_backing->iso_path, ent.name);
         game_backing->disc_name[0] = '\0'; // zero name string
 
-        if (strncmpci(ext, ".dol", 4) == 0 || strncmpci(ext, ".dol+cli", 8) == 0)
+        if (strncmpci(ext, ".dol", 4) == 0 || strncmpci(ext, ".dol+cli", 8) == 0) {
+            OSReport("Game is DOL, %s\n", ent.name);
             game_backing->is_dol = true;
+        }
 
         sorted_raw_game_backing_list[current_ent_index] = game_backing;
         current_ent_index++;
@@ -307,6 +320,10 @@ void *file_enum_worker(void* param) {
         }
         OSYieldThread();
 
+#ifdef PRINT_READDIR_FILES
+        OSReport("game path: %s\n", game_backing->iso_path);
+#endif
+
         file_status_t *status = dvd_custom_status();
         if (status == NULL || status->result != 0) {
             OSReport("ERROR: could not open file\n");
@@ -356,6 +373,10 @@ void *file_enum_worker(void* param) {
             }
 
             strncpy(game_backing->disc_name, header.GameName, 64);
+            game_backing->disc_name[63] = '\0';
+#ifdef PRINT_READDIR_FILES
+            OSReport("GAME name: %s\n", game_backing->disc_name);
+#endif
 
             char game_id[8];
             memcpy(game_id, &header, 6);
@@ -401,27 +422,40 @@ void *file_enum_worker(void* param) {
             dvd_threaded_read(banner_buffer, game_backing->dvd_bnr_size, game_backing->dvd_bnr_offset, status->fd); //Read banner file
             OSYieldThread();
 
-#ifdef PRINT_READDIR_FILES
-            // print the 4 bytes of the magic
-            OSReport("BNR magic: %c%c%c%c\n", banner_buffer->magic[0], banner_buffer->magic[1], banner_buffer->magic[2], banner_buffer->magic[3]);
-#endif
+            // OSReport("Compress banner\n");
+            // static u8 internal_storage[0x8000];
+            // if (!LZ4_initStream(&internal_storage[0], 0x8000)) {
+            //     OSReport("Failed to init LZ4 stream\n");
+            //     dvd_custom_close(status->fd);
+            //     continue;
+            // }
+
+            // int compressed_size = LZ4_compress_fast((char*)&banner_buffer, (char*)&compression_buffer[0], game_backing->dvd_bnr_size, sizeof(compression_buffer), 17);
+
+            // total_banner_size += game_backing->dvd_bnr_size;
+            // total_compressed_size += compressed_size;
 
             u32 bnr_magic = *(u32*)&banner_buffer->magic[0];
             if (bnr_magic != 0x424e5231 && bnr_magic != 0x424e5232) {
                 OSReport("Invalid banner magic, skipping\n");
                 dvd_custom_close(status->fd);
                 continue;
+            } else {
+#ifdef PRINT_READDIR_FILES
+                // print the 4 bytes of the magic
+                OSReport("BNR magic: %c%c%c%c\n", banner_buffer->magic[0], banner_buffer->magic[1], banner_buffer->magic[2], banner_buffer->magic[3]);
+#endif
             }
 
-            if (banner_buffer->desc[0].fullGameName[0] == 0) {
-                strncpy(banner_buffer->desc[0].fullGameName, game_backing->disc_name, 63);
-                banner_buffer->desc[0].fullGameName[63] = '\0';
-            }
+            // if (banner_buffer->desc[0].fullGameName[0] == 0) {
+            //     strncpy(banner_buffer->desc[0].fullGameName, game_backing->disc_name, 63);
+            //     banner_buffer->desc[0].fullGameName[63] = '\0';
+            // }
 
-            if (banner_buffer->desc[0].description[0] == 0) {
-                strncpy(banner_buffer->desc[0].description, game_backing->iso_path, 127);
-                banner_buffer->desc[0].description[127] = '\0';
-            }
+            // if (banner_buffer->desc[0].description[0] == 0) {
+            //     strncpy(banner_buffer->desc[0].description, game_backing->iso_path, 127);
+            //     banner_buffer->desc[0].description[127] = '\0';
+            // }
 
             // OSReport("Copying banner to ARAM\n");
             // aram_copy(&game_backing->aram_req, banner_buffer, 0x0200000 + (i * sizeof(BNR)), sizeof(BNR));
@@ -436,10 +470,10 @@ void *file_enum_worker(void* param) {
         current_ent_index++;
         game_backing_count = current_ent_index; // make entry active
 
-        if (current_ent_index >= 512) {
-            OSReport("ALPHA: Max game backings reached\n");
-            break;
-        }
+        // if (current_ent_index >= 512) {
+        //     OSReport("ALPHA: Max game backings reached\n");
+        //     break;
+        // }
 
         OSUnlockMutex(game_enum_mutex);
     }
@@ -448,7 +482,15 @@ void *file_enum_worker(void* param) {
     OSReport("Second file enum completed! took=%f (%d)\n", runtime, game_backing_count);
     (void)runtime;
 
-    // OSReport("[DONE] - KILL DOLPHIN NOW\n");
+    number_of_lines = (game_backing_count + 7) >> 3;
+    if (number_of_lines < 4) {
+        number_of_lines = 4;
+    }
+
+    OSReport("total_banner_size = %x\n", total_banner_size);
+    OSReport("total_compressed_size = %x\n", total_compressed_size);
+
+    OSReport("[DONE] - KILL DOLPHIN NOW\n");
     return NULL;
 }
 

@@ -3,12 +3,22 @@
 #include "patch_asm.h"
 
 // patch_inst vNTSC_11(_change_background_color) 0x81481cc8 .4byte 0xFFFF00FF
-// patch_inst vNTSC_10(_test_only_a) 0x81302778 nop
-// patch_inst vNTSC_10(_test_only_b) 0x813269a4 li r0, 255
-// patch_inst vPAL_10(_test_only) 0x8130825c inst_pause_forever
+// patch_inst vNTSC_11(_test_only_a) 0x8130bcfc li r0, 2
+// patch_inst vNTSC_11(_test_only_b) 0x81301448 bl before_audio_init
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
 // patch_inst vNTSC_11(_skip_menu_logo_a) 0x8130bcb4 li r3, 1
 // patch_inst vNTSC_11(_skip_menu_logo_b) 0x8130bcc0 li r0, 5
+
+// patch_inst vNTSC_11(_test_only_a) 0x8131bc00 bl patch_draw_box_group
+// patch_inst vNTSC_11(_test_only_b) 0x8130bc50 bl patch_anim_draw
+
+patch_inst vNTSC_10(_reduce_aram_alloc) 0x81301204 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
+patch_inst vNTSC_11(_reduce_aram_alloc) 0x81301040 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
+patch_inst vNTSC_12_001(_reduce_aram_alloc) 0x813013f4 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
+patch_inst vNTSC_12_101(_reduce_aram_alloc) 0x813013f8 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
+patch_inst vPAL_10(_reduce_aram_alloc) 0x81301040 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
+patch_inst vPAL_11(_reduce_aram_alloc) 0x81301040 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
+patch_inst vPAL_12(_reduce_aram_alloc) 0x81301040 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
 
 // patch_inst_ntsc "_force_lang" 0x8130b5b8 0x8130b740 0x8130bab4 0x8130bacc bl set_forced_lang
 patch_inst_ntsc "_force_lang" 0x8130b5b4 0x8130b73c 0x8130bab0 0x8130bac8 li r0, 0 // Force English=0, Japanese=2 (NTSC Only)
@@ -19,8 +29,8 @@ patch_inst vNTSC_10(_fix_banner_bnr2) 0x81302778 nop
 patch_inst_ntsc "_patch_font_init" 0x81301240 0x8130107c 0x81301430 0x81301434 bl setup_fonts
 patch_inst_pal "_patch_font_init" 0x8130107c 0x8130107c 0x813011e8 bl setup_fonts
 
-patch_inst_ntsc "_patch_card_status" 0x8131c770 0x8131ce9c 0x8131d234 0x8131d24c bl save_card_status
-patch_inst_pal "_patch_card_status" 0x8131d848 0x8131cdc8 0x8131d988 bl save_card_status
+patch_inst_ntsc "_patch_card_status_a" 0x8131c770 0x8131ce9c 0x8131d234 0x8131d24c bl save_card_status
+patch_inst_pal "_patch_card_status_a" 0x8131d848 0x8131cdc8 0x8131d988 bl save_card_status
 
 patch_inst_ntsc "_patch_card_info_a" 0x8131a694 0x8131aca0 0x8131b038 0x8131b050 bl patched_card_info
 patch_inst_pal "_patch_card_info_a" 0x8131b64c 0x8131abcc 0x8131b78c bl patched_card_info

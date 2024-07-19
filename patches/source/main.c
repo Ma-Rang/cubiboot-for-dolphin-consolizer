@@ -387,11 +387,7 @@ __attribute_used__ u32 bs2tick() {
     }
 
 #ifdef TEST_SKIP_ANIMATION
-        return STATE_COVER_OPEN;
-        return STATE_COVER_OPEN;
-    }
     return STATE_COVER_OPEN;
-    }
 #endif
 
     // TODO: allow the user to decide if they want to logo to play

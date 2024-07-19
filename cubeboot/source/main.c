@@ -302,7 +302,9 @@ int main(int argc, char **argv) {
 
     // // local vars
     // u8 *image_data = NULL;
+    // iprintf("XXX: settings.cube_logo = %s\n", settings.cube_logo);
     // if (settings.cube_logo != NULL && strlen(settings.cube_logo) > 0) {
+    //     iprintf("YYY\n");
     //     image_data = load_logo_texture(settings.cube_logo);
     //     iprintf("img can be found at %08x\n", (u32)image_data);
     // }

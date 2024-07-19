@@ -15,6 +15,7 @@
 
 #include "dol_tex_bin.h"
 #include "font.h"
+#include "boot.h"
 
 // TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
 #include "../build/default_opening_bin.h"
@@ -363,12 +364,14 @@ __attribute_used__ void draw_info_box(GXColor *color) {
             .inside_width = 0x1ff0,
             .inside_height = 0x460,
 
-            .boarder_index = { 0x28, 0x28, 0x28, 0x28 },
-            .boarder_unk = { 0x27, 0x0, 0x0, 0x0 },
+            .border_index = { 0x28, 0x28, 0x28, 0x28 }, // NTSC ALL
+            // .border_index = { 0x4b, 0x4b, 0x4b, 0x4b }, // PAL 10 + 12
+            // .border_index = { 0x12, 0x12, 0x12, 0x12 }, // PAL 11
+            .border_unk = { 0x27, 0x0, 0x0, 0x0 },
 
             .top_color = {},
             .bottom_color = {},
-        }
+        },
     };
 
     GXColor top_color = {0x6e, 0x00, 0xb3, 0xc8};
@@ -385,6 +388,18 @@ __attribute_used__ void draw_info_box(GXColor *color) {
 
     return;
 }
+
+// void patch_anim_draw() {
+//     void (*orig_anim_draw)() = (void*)0x8130d2fc;
+//     orig_anim_draw();
+
+//     void (*setup_camera_mtx)() = (void*)0x813030b0;
+//     setup_camera_mtx();
+//     prep_text_mode();
+
+//     GXColor white = {0xFF, 0xFF, 0xFF, 0xFF};
+//     draw_info_box(&white);
+// }
 
 // #define WITH_SPACE 1
 u32 move_frame = 0;
@@ -502,8 +517,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     // draw_named_tex(make_type('a','r','a','d'), menu_blob, &white, 0x800 - 100, 0); // TODO: y pos
 
     // box
-    if (rmode->viTVMode >> 2 == VI_NTSC) // quirk
-        draw_info_box(&white);
+    draw_info_box(&white);
 
     game_asset_t *asset = get_game_asset(selected_slot);
     if (asset != NULL && selected_slot < game_backing_count) {
@@ -648,6 +662,12 @@ __attribute_used__ s32 handle_gameselect_inputs() {
 
     if (pad_status->buttons_down & PAD_TRIGGER_Z) {
         // add test code here
+        load_stub(); // exit to loader again
+        u32 *sig = (u32*)0x80001804;
+        if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
+            static void (*reload)(void) = (void(*)(void))0x80001800;
+            run(reload);
+        }
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_B) {
