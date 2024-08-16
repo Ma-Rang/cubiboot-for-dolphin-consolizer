@@ -76,6 +76,18 @@ inline void dump_color(char *line, GXColorS10 *input) {
     OSReport("COLOR: %s = %02x%02x%02x = (%d, %d, %d)\n", line, cs10_temp.r, cs10_temp.g, cs10_temp.b, H(hsl_temp), S(hsl_temp), L(hsl_temp));
 }
 
+#define DUMP_SMALL_COLOR(x) dump_small_color(#x, x);
+
+inline void dump_small_color(char *line, GXColor *input) {
+    if (input == NULL) {
+        OSReport("COLOR: %s = NULL\n", line);
+        return;
+    }
+
+    GXColor cs_temp = *input;
+    OSReport("COLOR: %s = %02x%02x%02x\n", line, cs_temp.r, cs_temp.g, cs_temp.b);
+}
+
 inline void override_texture(tex_data *tex) {
     u16 wd = tex->width;
     u16 ht = tex->height;

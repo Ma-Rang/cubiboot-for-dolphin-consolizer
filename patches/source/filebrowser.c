@@ -19,6 +19,7 @@
 
 #include "flippy_sync.h"
 #include "dvd_threaded.h"
+#include "bnr_offsets.h"
 #include "gc_dvd.h"
 
 #include "../../cubeboot/include/bnr.h"
@@ -33,21 +34,6 @@
 // favorites
 // alphabetical (optionally show letter?)
 
-typedef struct {
-    bool is_dol;
-    bool is_gcm;
-    bool is_valid;
-    u32 fst_size;
-    u32 fst_offset;
-    u32 dvd_bnr_size;
-    u32 dvd_bnr_offset;
-    u32 mem_bnr_offset;
-    u32 aram_bnr_offset;
-    char disc_name[64];
-    char iso_path[128];
-    ARQRequest aram_req;
-} game_backing_entry_t;
-
 int cmp_iso_path(const void* ptr_a, const void* ptr_b){
     const game_backing_entry_t *obj_a = *(game_backing_entry_t**)ptr_a;
     const game_backing_entry_t *obj_b = *(game_backing_entry_t**)ptr_b;
@@ -60,7 +46,7 @@ game_backing_entry_t *sorted_raw_game_backing_list[2000];
 game_backing_entry_t *game_backing_list[2000];
 
 // bnr buffers for each game
-static game_asset_t (*game_assets)[512] = (void*)0x80100000; // needs 4mb usable
+static game_asset_t (*game_assets)[64] = (void*)0x80100000;
 // static u8 compression_buffer[0x2000];
 
 int total_banner_size = 0;
@@ -185,7 +171,7 @@ bool is_dol_slot(int slot_num) {
 
 // a function that will allocate a new entry in the asset list
 game_asset_t *claim_game_asset() {
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < 64; i++) {
         game_asset_t *asset = &(*game_assets)[i];
         if (!asset->in_use) {
             asset->in_use = 1;
@@ -205,9 +191,9 @@ void free_game_asset(int backing_index) {
 
 // a function that will get the current asset based on the backing index
 game_asset_t *get_game_asset(int backing_index) {
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < 64; i++) {
         game_asset_t *asset = &(*game_assets)[i];
-        if (asset->backing_index == backing_index) {
+        if (asset->backing_index == backing_index && asset->in_use) {
             return asset;
         }
     }
@@ -295,7 +281,8 @@ void *file_enum_worker(void* param) {
     }
     OSReport("Current lines = %d\n", number_of_lines);
 
-    memset((void*)0x80200000, 0, 0x300000); // clear assets
+    // Trevor is stupid
+    // memset((void*)0x80200000, 0, 0x300000); // clear assets
 
     // // test only
     // number_of_lines = 100;
@@ -335,7 +322,8 @@ void *file_enum_worker(void* param) {
             OSReport("DOL loaded: %s\n", game_backing->iso_path);
 #endif
 
-            if (current_ent_index < 512) {
+#if 0
+            if (current_ent_index < 64) {
                 game_asset_t *asset = &(*game_assets)[current_ent_index];
 #ifdef PRINT_READDIR_FILES
                 OSReport("Claiming asset %d (@%p)\n", current_ent_index, asset);
@@ -354,7 +342,7 @@ void *file_enum_worker(void* param) {
                 banner_buffer->desc[0].fullCompany[0] = '\0';
                 banner_buffer->desc[0].description[0] = '\0';
             }
-
+#endif
         } else {
 #ifdef PRINT_READDIR_FILES
             OSReport("BEFORE THREAD READ, %p\n", &header);
@@ -394,19 +382,28 @@ void *file_enum_worker(void* param) {
 #ifdef PRINT_READDIR_FILES
             OSReport("FSTSize = 0x%08x\n", game_backing->fst_size);
 #endif
-            // TODO: get_gcm_banner_fast
-            __DVDFSInit_threaded(status->fd, game_backing);
-            if (game_backing->dvd_bnr_offset == 0) {
-                OSReport("No opening.bnr found, skipping\n");
-                dvd_custom_close(status->fd);
-                continue;
+
+            // TODO: check if BNR valid with 32byte read?
+            game_backing->dvd_bnr_offset = get_banner_offset(&header);
+
+            if (!game_backing->dvd_bnr_offset) {
+                __DVDFSInit_threaded(status->fd, game_backing);
+                if (game_backing->dvd_bnr_offset == 0) {
+                    OSReport("No opening.bnr found, skipping\n");
+                    dvd_custom_close(status->fd);
+                    continue;
+                }
+            } else {
+                OSReport("FAST Opening.bnr found at %08x\n", game_backing->dvd_bnr_offset);
             }
 
 #ifdef PRINT_READDIR_FILES
             OSReport("Reading opening.bnr\n");
 #endif
+
             BNR *banner_buffer = &game_loading_banner;
-            if (current_ent_index < 512) {
+#if 0
+            if (current_ent_index < 64) {
                 game_asset_t *asset = &(*game_assets)[current_ent_index];
 #ifdef PRINT_READDIR_FILES
                 OSReport("Claiming asset %d (@%p)\n", current_ent_index, asset);
@@ -418,7 +415,7 @@ void *file_enum_worker(void* param) {
 
                 banner_buffer = (void*)&asset->banner;
             }
-
+#endif
             dvd_threaded_read(banner_buffer, game_backing->dvd_bnr_size, game_backing->dvd_bnr_offset, status->fd); //Read banner file
             OSYieldThread();
 

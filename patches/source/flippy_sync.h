@@ -1,5 +1,5 @@
 #include <gctypes.h>
-#include <ogc/cache.h>
+#include "os.h"
 #include "ipc.h"
 
 // ============================================================================

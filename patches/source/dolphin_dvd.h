@@ -38,6 +38,7 @@ typedef struct {
 	u32 ApploaderFunc2;
 	u32 ApploaderFunc3;
 	u8  unused_4[16];
+	// additional info
 	u32 DOLOffset;		//offset of main executable DOL (bootfile)
 	u32 FSTOffset;		//offset of the FST ("fst.bin")
 	u32	FSTSize;		//size of FST
@@ -46,19 +47,31 @@ typedef struct {
 	u32 UserPos;		//user position(?)
 	u32 UserLength;		//user length(?)
 	u32 unused_5;
-	u32 DebugMonSize;
-	u32 SimMemSize;
-	u32 ArgOffset;
-	u32 DebugFlag;
-	u32 TRKLocation;
-	u32 TRKSize;
-	u32 RegionCode;
-	u32 TotalDisc;
+	// === NOTE: start bi2
+	// u32 DebugMonSize;
+	// u32 SimMemSize;
+	// u32 ArgOffset;
+	// u32 DebugFlag;
+	// u32 TRKLocation;
+	// u32 TRKSize;
+	// u32 RegionCode;
+	// u32 TotalDisc;
 	// u32 LongFileName;
 	// u32 PADSpec;
 	// u32 DOLLimit;
 	// u8  unused_6[8148];
 } DiskHeader __attribute__((aligned(32)));
+
+typedef struct {
+	u32 DOLOffset;		//offset of main executable DOL (bootfile)
+	u32 FSTOffset;		//offset of the FST ("fst.bin")
+	u32	FSTSize;		//size of FST
+	u32	MaxFSTSize;		//maximum size of FST (usually same as FSTSize)*
+	u32 FSTAddress;
+	u32 UserPos;		//user position(?)
+	u32 UserLength;		//user length(?)
+	u32 unused_5;
+} DiskInfo __attribute__((aligned(32)));
 
 typedef struct _FSTEntry {
     u8 filetype : 1; //00 - Flags (0: File, 1: Directory)
@@ -67,13 +80,7 @@ typedef struct _FSTEntry {
     u32 len;
 } FSTEntry;
 
-void DVDInit(void);
+// void DVDInit(void);
 // DiskHeader *__DVDFSInit(void);
-BOOL DVD_CheckDisk(void);
-BOOL DVDOpen(const char* filename, dvdfileinfo* fileinfo);
-BOOL DVDFastOpen(s32, dvdfileinfo*);
-BOOL DVDClose(dvdfileinfo*);
-s32 DVDConvertFilenameToEntrynum(const char*);
-s32 DVDConvertPathToEntrynum(char*);
 
 #endif

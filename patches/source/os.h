@@ -3,6 +3,7 @@
 
 #include <gctypes.h>
 
+// from https://github.com/doldecomp/melee/blob/62e7b6af39da9ac19288ac7fbb454ad04d342658/src/dolphin/os/os.h#L16
 #define OSRoundUp32B(x)   (((u32)(x) + (32 - 1)) & ~(32 - 1))
 #define OSRoundDown32B(x) ((u32)(x) & ~(32 - 1))
 

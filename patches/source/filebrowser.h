@@ -2,17 +2,35 @@
 
 #include "../../cubeboot/include/bnr.h"
 
-extern int game_backing_count;
-extern OSMutex *game_enum_mutex;
-// extern game_backing_entry_t *game_backing_list[1000];
+typedef struct {
+    bool is_dol;
+    bool is_gcm;
+    bool is_valid;
+    u32 fst_size;
+    u32 fst_offset;
+    u32 dvd_bnr_size;
+    u32 dvd_bnr_offset;
+    // u32 mem_bnr_offset;
+    // u32 aram_bnr_offset;
+    char disc_name[64];
+    char iso_path[128];
+
+    // ARQRequest aram_req;
+} game_backing_entry_t;
 
 typedef struct {
-    BNR banner;
+    // BNR banner;
+    u8 pixelData[BNR_PIXELDATA_LEN];
     int backing_index;
-    int in_use;
+    s8 in_use;
+    // ????
     u8 game_id[6];
-    u8 padding[96 - (4 * 2) - 6]; // pad to 8kb
+    // u8 padding[96 - (4 * 2) - 6]; // pad to 8kb
 } game_asset_t;
+
+extern int game_backing_count;
+extern OSMutex *game_enum_mutex;
+extern game_backing_entry_t *game_backing_list[2000];
 
 void start_file_enum();
 void start_main_loop();

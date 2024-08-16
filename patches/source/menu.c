@@ -16,6 +16,7 @@
 #include "dol_tex_bin.h"
 #include "font.h"
 #include "boot.h"
+#include "ipl.h"
 
 // TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
 #include "../build/default_opening_bin.h"
@@ -47,7 +48,7 @@ __attribute_reloc__ void (*change_model)(model* m);
 
 // for menu elements
 __attribute_reloc__ void (*draw_grid)(Mtx position, u8 alpha);
-__attribute_reloc__ void (*draw_box)(u32 index, box_draw_group* header, GXColor* rasc, int inside_x, int inside_y, int inside_width, int inside_height);
+__attribute_reloc__ void (*draw_box)(u32 index, box_draw_group* header, GXColor* texa, int inside_x, int inside_y, int inside_width, int inside_height);
 // __attribute_reloc__ void (*draw_start_info)(u8 alpha);
 __attribute_reloc__ void (*draw_start_anim)(u8 alpha);
 __attribute_reloc__ void (*draw_blob_fixed)(void *blob_ptr, void *blob_a, void *blob_b, GXColor *color);
@@ -280,8 +281,9 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
     f32 sc = pos->scale;
     guVector scale = {sc, sc, sc};
 
-    game_asset_t *asset = get_game_asset(slot_num);
-    if (asset == NULL) has_texture = false;
+    // game_asset_t *asset = get_game_asset(slot_num);
+    // if (asset == NULL) has_texture = false;
+    has_texture = false; // TEMP HACK
 
     model *m = NULL;
     if (has_texture) {
@@ -307,6 +309,9 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
 
     // draw icon
     m->alpha = (u8)((f32)alpha * pos->opacity);
+#if 1
+    draw_model(m);
+#else
     if (has_texture) {
         // cube
         draw_partial(m, &m->data->parts[2]);
@@ -340,12 +345,36 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
     } else {
         draw_model(m);
     }
+#endif
 
     return;
 }
 
-__attribute_used__ void draw_info_box(GXColor *color) {
-    static struct {
+inline u16 get_border_index() {
+    u16 border_index = 0;
+    switch (get_ipl_revision()) {
+    case IPL_NTSC_10_001:
+    case IPL_NTSC_10_002:
+    case IPL_NTSC_11_001:
+    case IPL_NTSC_12_001:
+    case IPL_NTSC_12_101:
+        border_index = 0x28;
+        break;
+    case IPL_PAL_10_001:
+    case IPL_PAL_10_002:
+    case IPL_PAL_12_101:
+        border_index = 0x4b;
+    case IPL_MPAL_11:
+        border_index = 0x12;
+    default:
+        break;
+    }
+
+    return border_index;
+}
+
+__attribute_used__ void draw_info_box(u16 width, u16 height, u16 center_x, u16 center_y, u8 alpha, GXColor *top_color, GXColor *bottom_color) {
+    struct {
         box_draw_group group;
         box_draw_metadata metadata;
     } blob = {
@@ -353,56 +382,49 @@ __attribute_used__ void draw_info_box(GXColor *color) {
             .type = make_type('G','L','H','0'),
             .metadata_offset = sizeof(box_draw_group),
         },
-        .metadata = {
-            .center_x = 0x1230,
-            .center_y = 0x1640,
-            .width = 0x20f0,
-            .height = 0x560,
-
-            .inside_center_x = 0x80,
-            .inside_center_y = 0x80,
-            .inside_width = 0x1ff0,
-            .inside_height = 0x460,
-
-            .border_index = { 0x28, 0x28, 0x28, 0x28 }, // NTSC ALL
-            // .border_index = { 0x4b, 0x4b, 0x4b, 0x4b }, // PAL 10 + 12
-            // .border_index = { 0x12, 0x12, 0x12, 0x12 }, // PAL 11
-            .border_unk = { 0x27, 0x0, 0x0, 0x0 },
-
-            .top_color = {},
-            .bottom_color = {},
-        },
+        .metadata = {0}, // zero out
     };
 
-    GXColor top_color = {0x6e, 0x00, 0xb3, 0xc8};
-    GXColor bottom_color = {0x80, 0x00, 0x57, 0xb4};
-    copy_gx_color(&top_color, &blob.metadata.top_color[0]);
-    copy_gx_color(&top_color, &blob.metadata.top_color[1]);
-    copy_gx_color(&bottom_color, &blob.metadata.bottom_color[0]);
-    copy_gx_color(&bottom_color, &blob.metadata.bottom_color[1]);
+    box_draw_metadata *box = &blob.metadata;
+    u16 border_index = get_border_index();
+    box->border_index[0] = box->border_index[1] = box->border_index[2] = box->border_index[3] = border_index;
+    box->border_unk[0] = 0x27; // unk const
 
-    box_draw_metadata *box = (box_draw_metadata*)((u32)&blob + blob.group.metadata_offset);
+    s16 border_offset = 0x80;
+    box->inside_center_x = border_offset;
+    box->inside_center_y = border_offset;
+    box->center_x = center_x;
+    box->center_y = center_y;
+
+    box->width = width;
+    box->height = height;
+    box->inside_width = width - (border_offset << 1);
+    box->inside_height = height - (border_offset << 1);
+
+    copy_gx_color(top_color, &box->top_color[0]);
+    copy_gx_color(top_color, &box->top_color[1]);
+    copy_gx_color(bottom_color, &box->bottom_color[0]);
+    copy_gx_color(bottom_color, &box->bottom_color[1]);
+
 	int inside_x = box->center_x - (box->inside_width / 2);
 	int inside_y = box->center_y - (box->inside_height / 2);
-	draw_box(0, &blob.group, color, inside_x, inside_y, box->inside_width, box->inside_height);
+
+    GXColor box_color = {255, 255, 255, alpha};
+	draw_box(0, &blob.group, &box_color, inside_x, inside_y, box->inside_width, box->inside_height);
 
     return;
 }
 
-// void patch_anim_draw() {
-//     void (*orig_anim_draw)() = (void*)0x8130d2fc;
-//     orig_anim_draw();
+void patch_anim_draw() {
+    prep_text_mode();
 
-//     void (*setup_camera_mtx)() = (void*)0x813030b0;
-//     setup_camera_mtx();
-//     prep_text_mode();
-
-//     GXColor white = {0xFF, 0xFF, 0xFF, 0xFF};
-//     draw_info_box(&white);
-// }
+    GXColor top_color = {0x6e, 0x00, 0xb3, 0xc8};
+    GXColor bottom_color = {0x80, 0x00, 0x57, 0xb4};
+    draw_info_box(0x1200, 0x560, 0x1230, 0xb20, 0xff, &top_color, &bottom_color);
+}
 
 // #define WITH_SPACE 1
-u32 move_frame = 0;
+static u32 move_frame = 0;
 
 void setup_icon_positions() {
 #if defined(WITH_SPACE) && WITH_SPACE
@@ -517,16 +539,20 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     // draw_named_tex(make_type('a','r','a','d'), menu_blob, &white, 0x800 - 100, 0); // TODO: y pos
 
     // box
-    draw_info_box(&white);
+    GXColor top_color = {0x6e, 0x00, 0xb3, 0xc8};
+    GXColor bottom_color = {0x80, 0x00, 0x57, 0xb4};
+    draw_info_box(0x20f0, 0x560, 0x1230, 0x1640, ui_alpha, &top_color, &bottom_color);
 
     game_asset_t *asset = get_game_asset(selected_slot);
     if (asset != NULL && selected_slot < game_backing_count) {
         if (asset->game_id[3] == 'J') switch_lang_jpn();
         else switch_lang_eng();
 
+#if 0
         // info
         draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, asset->banner.desc->fullGameName, 0x1f);
         draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, asset->banner.desc->description, 0x1f);
+#endif
 
         switch_lang_eng();
         if (is_dol_slot(selected_slot)) {
@@ -545,10 +571,12 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
             draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
             draw_text("ISO", 20, 125, 540, &white);
 
+#if 0
             // banner image
             setup_tex_draw(1, 0, 1);
             banner_texture.offset = (s32)((u32)(asset->banner.pixelData) - (u32)&banner_texture);
             draw_blob_tex(make_type('b','a','n','a'), menu_blob, &white, &banner_texture);
+#endif
         }
         switch_lang_orig();
     }
@@ -565,6 +593,7 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     if (asset->game_id[3] == 'J') switch_lang_jpn();
     else switch_lang_eng();
 
+#if 0
     if (!is_dol_slot(selected_slot)) {
         // game banner
         setup_tex_draw(1, 0, 1);
@@ -577,6 +606,7 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     draw_blob_text(make_type('t','i','t','l'), game_blob_b, &white, asset->banner.desc->fullGameName, 0x40);
     draw_blob_text(make_type('m','a','k','r'), game_blob_b, &white, asset->banner.desc->fullCompany, 0x40);
     draw_blob_text_long(make_type('i','n','f','o'), game_blob_b, &white, asset->banner.desc->description, 0x80);
+#endif
 
     // press start anim
     draw_start_anim(ui_alpha); // TODO: fix alpha timing
@@ -687,16 +717,18 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         if (selected_slot < game_backing_count && !in_submenu_transition) {
             in_submenu_transition = true;
             current_gameselect_state = SUBMENU_GAMESELECT_START;
+#if 0
             game_asset_t *asset = get_game_asset(selected_slot);
             if (asset != NULL) {
                 *banner_pointer = (u32)&asset->banner; // banner buf
             }
-    
+#endif
+
             Jac_PlaySe(SOUND_SUBMENU_ENTER);
             setup_gameselect_anim();
             setup_cube_anim();
 
-            OSReport("Selected slot: %d (%p)\n", selected_slot, asset);
+            // OSReport("Selected slot: %d (%p)\n", selected_slot, asset);
         }
     }
 

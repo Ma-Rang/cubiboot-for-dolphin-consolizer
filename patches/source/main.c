@@ -343,31 +343,15 @@ __attribute_used__ u32 get_tvmode() {
 
 __attribute_data__ int frame_count = 0;
 __attribute_used__ u32 bs2tick() {
-    // // TODO: move this check to PADRead in main loop
-    // if (pad_status->pad.button != local_state.last_buttons) {
-    //     for (int i = 0; i < MAX_BUTTONS; i++) {
-    //         u16 bitmask = 1 << i;
-    //         u16 pressed = (pad_status->pad.button & bitmask) >> i;
-
-    //         // button changed state
-    //         if (local_state.held_buttons[i].status != pressed) {
-    //             if (pressed) {
-    //                 local_state.held_buttons[i].timestamp = gettime();
-    //             } else {
-    //                 local_state.held_buttons[i].timestamp = 0;
-    //             }
-    //         }
-
-    //         local_state.held_buttons[i].status = pressed;
-    //     }
-    // }
-    // local_state.last_buttons = pad_status->pad.button;
-
     frame_count++;
     if (!completed_time && cube_state->cube_anim_done) {
         OSReport("FINISHED (%d)\n", frame_count);
         completed_time = gettime();
     }
+
+#ifdef TEST_SKIP_ANIMATION
+    return STATE_COVER_OPEN;
+#endif
 
     if (start_passthrough_game) {
         if (postboot_delay_ms) {
@@ -385,10 +369,6 @@ __attribute_used__ u32 bs2tick() {
     if (*main_menu_id >= 3) {
         return STATE_START_GAME;
     }
-
-#ifdef TEST_SKIP_ANIMATION
-    return STATE_COVER_OPEN;
-#endif
 
     // TODO: allow the user to decide if they want to logo to play
     return STATE_NO_DISC;

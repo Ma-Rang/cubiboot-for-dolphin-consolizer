@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#include "config.h"
+// #define USE_NATIVE_SPRINTF
 
 #ifndef USE_NATIVE_SPRINTF
 int rpl_vsnprintf(char *, size_t, const char *, va_list);
