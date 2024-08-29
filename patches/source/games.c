@@ -15,8 +15,7 @@
 
 #include <gctypes.h>
 
-#include "pool.h"
-// #include "tinyheap/tinyheap.h"
+#include "pmalloc/pmalloc.h"
 #include "picolibc.h"
 #include "reloc.h"
 #include "attr.h"
@@ -93,12 +92,21 @@ static gm_file_entry_t *gm_entry_backing[2000];
 static u32 gm_entry_count = 0;
 
 // HEAP
-__attribute_aligned_data_lowmem__ static u8 gm_pool_buffer[3 * 1024 * 1024];
-static pool_t *gm_pool = (pool_t*)&gm_pool_buffer;
+pmalloc_t pmblock;
+pmalloc_t *pm = &pmblock;
+__attribute_aligned_data_lowmem__ static u8 gm_heap_buffer[3 * 1024 * 1024];
+
 
 void gm_init_heap() {
-    OSReport("Initializing heap [%x]\n", sizeof(gm_pool_buffer));
-    pool_init(gm_pool, sizeof(gm_pool_buffer));
+    OSReport("Initializing heap [%x]\n", sizeof(gm_heap_buffer));
+    
+    // Initialise our pmalloc
+	pmalloc_init(pm);
+	pmalloc_addblock(pm, &gm_heap_buffer[0], sizeof(gm_heap_buffer));
+
+    // test alloc
+    void *ptr = pmalloc_malloc(pm, 1024);
+    OSReport("Allocated ptr = %p\n", ptr);
 }
 
 // HELPERS
@@ -243,7 +251,7 @@ void gm_check_headers(int path_count) {
             OSReport("Found game %s\n", entry->path); // lets do this!
 
             // create a new entry
-            gm_file_entry_t *backing = pool_alloc(gm_pool, sizeof(gm_file_entry_t));
+            gm_file_entry_t *backing = pmalloc_malloc(pm, sizeof(gm_file_entry_t));
             memcpy(backing->path, entry->path, sizeof(backing->path));
 
             // copy the extra info
@@ -258,7 +266,7 @@ void gm_check_headers(int path_count) {
             OSReport("Found other %s\n", entry->path); // lets do this!
 
             // create a new entry
-            gm_file_entry_t *backing = pool_alloc(gm_pool, sizeof(gm_file_entry_t));
+            gm_file_entry_t *backing = pmalloc_malloc(pm, sizeof(gm_file_entry_t));
             memcpy(backing->path, entry->path, sizeof(backing->path));
 
             // set heap pointer
@@ -288,7 +296,7 @@ static bool gm_load_banner(gm_file_entry_t *entry) {
     __attribute_aligned_data__ static BNR banner_buffer;
     dvd_threaded_read(&banner_buffer, sizeof(BNR), entry->extra.dvd_bnr_offset, status->fd);
 
-    void *banner_ptr = pool_alloc(gm_pool, sizeof(BNR_PIXELDATA_LEN));
+    void *banner_ptr = pmalloc_malloc(pm, sizeof(BNR_PIXELDATA_LEN));
     if (banner_ptr == NULL) {
         OSReport("ERROR: could not allocate memory\n");
         return false;
@@ -349,6 +357,8 @@ void gm_load_assets() {
             entry->asset.state = GM_LOAD_STATE_LOADED;
         }
     }
+
+    pmalloc_dump_stats(pm);
 }
 
 static bool first = true;
