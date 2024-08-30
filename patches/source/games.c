@@ -29,6 +29,7 @@
 #include "grid.h"
 #include "time.h"
 
+#include "icon.h"
 #include "bnr.h"
 
 // Globals
@@ -40,10 +41,11 @@ OSMutex *game_enum_mutex = &game_enum_mutex_obj;
 
 // Backing
 typedef enum {
+    GM_LOAD_STATE_SETUP, // valid for use
     GM_LOAD_STATE_UNLOADED,
     GM_LOAD_STATE_UNLOADING,
     GM_LOAD_STATE_LOADING,
-    GM_LOAD_STATE_LOADED,
+    GM_LOAD_STATE_LOADED, // valid for use
     GM_LOAD_STATE_FAILED
 } gm_load_state_t;
 
@@ -55,14 +57,32 @@ typedef enum {
 } gm_file_type_t;
 
 typedef struct {
-    gm_load_state_t state;
+    u32 used;
+    u8 data[ICON_PIXELDATA_LEN];
+} gm_icon_buf_t;
+
+typedef struct {
+    u32 used;
+    u8 data[BNR_PIXELDATA_LEN];
+} gm_banner_buf_t;
+
+typedef struct {
+    ARQRequest req;
     u32 aram_offset;
-    union {
-        void *buffer_ptr;
-        void *icon_ptr;
-        
-    };
-    void *banner_ptr;
+    gm_load_state_t state;
+    gm_icon_buf_t *buf;
+} gm_icon_t;
+
+typedef struct {
+    ARQRequest req;
+    u32 aram_offset;
+    gm_load_state_t state;
+    gm_banner_buf_t *buf;
+} gm_banner_t;
+
+typedef struct {
+    gm_icon_t icon;
+    gm_banner_t banner;
 } gm_asset_t;
 
 typedef struct {
@@ -91,11 +111,151 @@ __attribute_data_lowmem__ static gm_path_entry_t *__gm_sorted_path_list[2000];
 static gm_file_entry_t *gm_entry_backing[2000];
 static u32 gm_entry_count = 0;
 
+__attribute_data_lowmem__ static gm_icon_buf_t gm_icon_pool[64];
+__attribute_data_lowmem__ static gm_banner_buf_t gm_banner_pool[64];
+
+static inline gm_icon_buf_t *gm_get_icon_buf() {
+    for (int i = 0; i < 64; i++) {
+        if (gm_icon_pool[i].used == 0) {
+            gm_icon_pool[i].used = 1;
+            return &gm_icon_pool[i];
+        }
+    }
+
+    return NULL;
+}
+
+static inline void gm_free_icon_buf(gm_icon_buf_t *buf) {
+    buf->used = 0;
+}
+
+static inline gm_banner_buf_t *gm_get_banner_buf() {
+    for (int i = 0; i < 64; i++) {
+        if (gm_banner_pool[i].used == 0) {
+            gm_banner_pool[i].used = 1;
+            return &gm_banner_pool[i];
+        }
+    }
+
+    return NULL;
+}
+
+static inline void gm_free_banner_buf(gm_banner_buf_t *buf) {
+    buf->used = 0;
+}
+
+// TODO: swap the icon/banner callback with req->owner checks
+static void arq_icon_callback_setup(u32 arq_request_ptr) {
+    ARQRequest *req = (ARQRequest*)arq_request_ptr;
+    gm_icon_t *icon = (gm_icon_t*)req;
+
+    icon->state = GM_LOAD_STATE_LOADED;
+}
+
+static void arq_icon_callback_unload(u32 arq_request_ptr) {
+    ARQRequest *req = (ARQRequest*)arq_request_ptr;
+    gm_icon_t *icon = (gm_icon_t*)req;
+
+    icon->state = GM_LOAD_STATE_UNLOADED;
+    gm_free_icon_buf(icon->buf);
+}
+
+static void arq_icon_callback_load(u32 arq_request_ptr) {
+    ARQRequest *req = (ARQRequest*)arq_request_ptr;
+    gm_icon_t *icon = (gm_icon_t*)req;
+
+    icon->state = GM_LOAD_STATE_LOADED;
+}
+
+static void arq_banner_callback_setup(u32 arq_request_ptr) {
+    OSReport("CALLBACK arq_banner_callback_setup\n");
+    ARQRequest *req = (ARQRequest*)arq_request_ptr;
+    gm_banner_t *banner = (gm_banner_t*)req;
+
+    banner->state = GM_LOAD_STATE_LOADED;
+}
+
+static void arq_banner_callback_unload(u32 arq_request_ptr) {
+    OSReport("CALLBACK arq_banner_callback_unload\n");
+    ARQRequest *req = (ARQRequest*)arq_request_ptr;
+    gm_banner_t *banner = (gm_banner_t*)req;
+
+    banner->state = GM_LOAD_STATE_UNLOADED;
+    gm_free_banner_buf(banner->buf);
+}
+
+static void arq_banner_callback_load(u32 arq_request_ptr) {
+    OSReport("CALLBACK arq_banner_callback_load\n");
+    ARQRequest *req = (ARQRequest*)arq_request_ptr;
+    gm_banner_t *banner = (gm_banner_t*)req;
+
+    banner->state = GM_LOAD_STATE_LOADED;
+}
+
+// asset offload helpers
+// void gm_icon_setup(gm_icon_t *icon, u32 aram_offset) // init time only
+// void gm_icon_unload // init time only
+// void gm_icon_load // runtime funcs
+// void gm_icon_free // runtime funcs
+
+void gm_banner_setup(gm_banner_t *banner, u32 aram_offset) {
+    OSReport("Setting up banner\n");
+    banner->aram_offset = aram_offset;
+    banner->state = GM_LOAD_STATE_SETUP;
+
+    ARQRequest *req = &banner->req;
+    u32 owner = make_type('I', 'C', 'O', 'N');
+    u32 type = ARAM_DIR_MRAM_TO_ARAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = (u32)banner->buf->data;
+    u32 dest = aram_offset;
+    u32 length = BNR_PIXELDATA_LEN;
+
+    dolphin_ARQPostRequest(req, owner, type, priority, source, dest, length, &arq_banner_callback_setup);
+}
+
+void gm_banner_setup_unload(gm_banner_t *banner, u32 aram_offset) {
+    banner->aram_offset = aram_offset;
+    banner->state = GM_LOAD_STATE_UNLOADING;
+
+    ARQRequest *req = &banner->req;
+    u32 owner = make_type('I', 'C', 'O', 'N');
+    u32 type = ARAM_DIR_MRAM_TO_ARAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = (u32)banner->buf->data;
+    u32 dest = aram_offset;
+    u32 length = BNR_PIXELDATA_LEN;
+
+    dolphin_ARQPostRequest(req, owner, type, priority, source, dest, length, &arq_banner_callback_unload);
+}
+
+void gm_banner_load(gm_banner_t *banner) {
+    banner->state = GM_LOAD_STATE_LOADING;
+
+    ARQRequest *req = &banner->req;
+    u32 owner = make_type('I', 'C', 'O', 'N');
+    u32 type = ARAM_DIR_ARAM_TO_MRAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = banner->aram_offset;
+    u32 dest = (u32)banner->buf->data;
+    u32 length = BNR_PIXELDATA_LEN;
+
+    dolphin_ARQPostRequest(req, owner, type, priority, source, dest, length, &arq_banner_callback_load);
+}
+
+void gm_banner_free(gm_banner_t *banner) {
+    banner->state = GM_LOAD_STATE_UNLOADED;
+    gm_free_banner_buf(banner->buf);
+}
+
 // HEAP
 pmalloc_t pmblock;
 pmalloc_t *pm = &pmblock;
-__attribute_aligned_data_lowmem__ static u8 gm_heap_buffer[3 * 1024 * 1024];
+__attribute_aligned_data_lowmem__ static u8 gm_heap_buffer[2 * 1024 * 1024];
 
+// MACROS
+#define gm_malloc(x) pmalloc_memalign(pm, x, 32);
+#define gm_free(x) pmalloc_freealign(pm, x);
 
 void gm_init_heap() {
     OSReport("Initializing heap [%x]\n", sizeof(gm_heap_buffer));
@@ -103,10 +263,6 @@ void gm_init_heap() {
     // Initialise our pmalloc
 	pmalloc_init(pm);
 	pmalloc_addblock(pm, &gm_heap_buffer[0], sizeof(gm_heap_buffer));
-
-    // test alloc
-    void *ptr = pmalloc_malloc(pm, 1024);
-    OSReport("Allocated ptr = %p\n", ptr);
 }
 
 // HELPERS
@@ -244,15 +400,16 @@ void gm_check_headers(int path_count) {
         gm_path_entry_t *entry = __gm_sorted_path_list[i];
         // OSReport("Checking header %s [%d]\n", entry->path, entry->type);
 
-         // check if the banner file exists
         if (entry->type == GM_FILE_TYPE_GAME) {
+            // check if the banner file exists
             dolphin_game_into_t info = get_game_info(entry->path);
             if (!info.valid) continue;
             OSReport("Found game %s\n", entry->path); // lets do this!
 
             // create a new entry
-            gm_file_entry_t *backing = pmalloc_malloc(pm, sizeof(gm_file_entry_t));
+            gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
             memcpy(backing->path, entry->path, sizeof(backing->path));
+            backing->type = GM_FILE_TYPE_GAME;
 
             // copy the extra info
             memcpy(backing->extra.game_id, info.game_id, sizeof(backing->extra.game_id));
@@ -266,8 +423,9 @@ void gm_check_headers(int path_count) {
             OSReport("Found other %s\n", entry->path); // lets do this!
 
             // create a new entry
-            gm_file_entry_t *backing = pmalloc_malloc(pm, sizeof(gm_file_entry_t));
+            gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
             memcpy(backing->path, entry->path, sizeof(backing->path));
+            backing->type = entry->type;
 
             // set heap pointer
             gm_entry_backing[gm_entry_count] = backing;
@@ -282,7 +440,8 @@ void gm_check_headers(int path_count) {
     (void)runtime;
 }
 
-static bool gm_load_banner(gm_file_entry_t *entry) {
+// returns amount of space used in aram
+static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
     if (entry->extra.dvd_bnr_offset == 0) return false;
 
     // load the banner
@@ -295,15 +454,22 @@ static bool gm_load_banner(gm_file_entry_t *entry) {
 
     __attribute_aligned_data__ static BNR banner_buffer;
     dvd_threaded_read(&banner_buffer, sizeof(BNR), entry->extra.dvd_bnr_offset, status->fd);
+    dvd_custom_close(status->fd);
 
-    void *banner_ptr = pmalloc_malloc(pm, sizeof(BNR_PIXELDATA_LEN));
+    entry->asset.banner.state = GM_LOAD_STATE_LOADING;
+    void *banner_ptr = gm_get_banner_buf();
     if (banner_ptr == NULL) {
         OSReport("ERROR: could not allocate memory\n");
         return false;
     }
 
     memcpy(banner_ptr, &banner_buffer.pixelData[0], BNR_PIXELDATA_LEN);
-    entry->asset.banner_ptr = banner_ptr;
+    entry->asset.banner.buf = banner_ptr;
+    if (force_unload) {
+        gm_banner_setup_unload(&entry->asset.banner, aram_offset);
+    } else {
+        gm_banner_setup(&entry->asset.banner, aram_offset);
+    }
 
     // TODO: check current language using extra.dvd_bnr_type
     memcpy(&entry->desc, &banner_buffer.desc[0], sizeof(BNRDesc));
@@ -311,54 +477,47 @@ static bool gm_load_banner(gm_file_entry_t *entry) {
     return true;
 }
 
+// returns amount of space used in aram
+static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
+    return false;
+}
+
 void gm_load_assets() {
+    u32 aram_offset = (1 * 1024 * 1024); // 1MB mark
+
     for (int i = 0; i < gm_entry_count; i++) {
         gm_file_entry_t *entry = gm_entry_backing[i];
-        OSReport("[%d] Loading assets %s\n", i, entry->path);
+        OSReport("[%d] Loading assets %s (%d)\n", i, entry->path, entry->type);
 
-        // bool offload_assets = false;
-        // if (i >= 40) {
-        //     OSReport("WARNING: Too many files in directory\n");
-        //     offload_assets = true;
-        //     break;
-        // }
+        bool force_unload = false;
+        if (i >= 48) {
+            force_unload = true;
+        }
 
         // Load assets for each approved path and store them in the auxiliarly data RAM using DMA
         if (entry->type == GM_FILE_TYPE_GAME) {
             // load the banner
-            bool bnr_loaded = gm_load_banner(entry);
+            bool bnr_loaded = gm_load_banner(entry, aram_offset, force_unload);
             if (!bnr_loaded) {
                 OSReport("Failed to load banner %s\n", entry->path);
                 continue;
             }
 
             // // load the icon
-            // u32 icon_size = 0;
-            // void *icon_ptr = gm_load_icon(entry->path, &icon_size, );
-            // if (icon_ptr == NULL) {
+            // bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
+            // if (!icon_loaded) {
             //     OSReport("Failed to load icon %s\n", entry->path);
             //     continue;
             // }
-
-            // store the assets
-            entry->asset.icon_ptr = NULL;
-            entry->asset.aram_offset = 0; // TODO: store in ARAM
-            entry->asset.state = GM_LOAD_STATE_LOADED;
         } else {
             // // load the icon
-            // ???
-
-            // use default icon
-            void *icon_ptr = NULL; 
-
-            // store the assets
-            entry->asset.icon_ptr = icon_ptr;
-            entry->asset.aram_offset = 0; // TODO: store in ARAM
-            entry->asset.state = GM_LOAD_STATE_LOADED;
+            // bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
+            // if (!icon_loaded) {
+            //     OSReport("Failed to load icon %s\n", entry->path);
+            //     continue;
+            // }
         }
     }
-
-    pmalloc_dump_stats(pm);
 }
 
 static bool first = true;
@@ -377,3 +536,19 @@ void gm_start_thread() {
     gm_load_assets();
     grid_setup_func();
 }
+
+// TODO: thread
+
+// // match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
+// static u8 thread_obj[0x310];
+// static u8 thread_stack[32 * 1024];
+// void start_file_enum() {
+//     u32 thread_stack_size = sizeof(thread_stack);
+//     void *thread_stack_top = thread_stack + thread_stack_size;
+//     s32 thread_priority = DEFAULT_THREAD_PRIO + 3;
+
+//     OSInitMutex(game_enum_mutex);
+
+//     dolphin_OSCreateThread(&thread_obj[0], file_enum_worker, 0, thread_stack_top, thread_stack_size, thread_priority, 0);
+//     dolphin_OSResumeThread(&thread_obj[0]);
+// }

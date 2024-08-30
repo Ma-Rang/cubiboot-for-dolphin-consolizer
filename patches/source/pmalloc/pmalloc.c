@@ -52,6 +52,7 @@ void *pmalloc_malloc(pmalloc_t *pm, uint32_t size)
 
 	// If there's nothing suitable, we're either out of memory or fragged.
 	if(current == NULL) return NULL;
+	current->magic = 0xFEEDFACE;
 
 	// Remove it from pm->available
 	pmalloc_item_remove(&pm->available, current);
@@ -311,4 +312,37 @@ void pmalloc_dump_stats(pmalloc_t *pm) {
 	} 
 
 	OSReport("---------------------\n");
+}
+
+// hacks for alignment
+// Note that 0xFEEDFACE is used to find the end of the block header
+// and we keep searching backwards skipping 4 bytes at a time until we find it
+
+void *pmalloc_memalign(pmalloc_t *pm, uint32_t size, uint32_t align) {
+	// Allocate the memory
+	void *mem = pmalloc_malloc(pm, size + align); // TODO: this can actually be (align - 4)
+	if (mem == NULL) return NULL;
+
+	// Align the memory
+	uintptr_t memalignd = ((uintptr_t)mem + align - 1) & ~(align - 1);
+
+	// Fill the padding with 0xDEADBEEF
+	uintptr_t offset = memalignd - (uintptr_t)mem;
+	for (int i = 0; i < offset >> 2; i++)
+		((uint32_t*)mem)[i] = 0xDEADBEEF;
+
+	return (void*)memalignd;
+}
+
+void pmalloc_freealign(pmalloc_t *pm, void *ptr) {
+	// Find the original pointer by searching backwards
+	uintptr_t ptralignd = (uintptr_t)ptr;
+	while (((uint32_t*)(ptralignd - sizeof(uint32_t)))[0] != 0xFEEDFACE) // TODO: create a jmp half-word like (0xCAFE0000 | 0x0010)
+		ptralignd -= sizeof(uint32_t);
+
+	// Set pointer
+	void *mem = (void*)ptralignd;
+
+	// Free the memory
+	pmalloc_free(pm, mem);
 }

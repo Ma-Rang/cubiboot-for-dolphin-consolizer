@@ -40,5 +40,9 @@ void pmalloc_item_remove(pmalloc_item_t **root, pmalloc_item_t *node);  // Remov
 // Debug
 void pmalloc_dump_stats(pmalloc_t *pm);                                 // Debug Function
 
+// Hack
+void *pmalloc_memalign(pmalloc_t *pm, uint32_t size, uint32_t align);
+void pmalloc_freealign(pmalloc_t *pm, void *ptr);
+
 #endif
 

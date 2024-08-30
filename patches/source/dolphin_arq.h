@@ -24,5 +24,4 @@ typedef struct ARQRequest {
     ARQCallback callback;
 } ARQRequest;
 
-void aram_copy_async(ARQRequest *task, void *src, u32 dst, u32 size);
-void aram_copy(void *src, u32 dst, u32 size);
+void dolphin_ARQPostRequest(ARQRequest *task, u32 owner, u32 type, u32 priority, u32 source, u32 dest, u32 length, ARQCallback callback);
