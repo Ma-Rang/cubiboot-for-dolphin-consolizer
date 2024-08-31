@@ -26,6 +26,9 @@
 #include "flippy_sync.h"
 #include "dvd_threaded.h"
 
+#include "ok_png.h"
+#include "metaphrasis.h"
+
 #include "grid.h"
 #include "time.h"
 
@@ -41,12 +44,12 @@ OSMutex *game_enum_mutex = &game_enum_mutex_obj;
 
 // Backing
 typedef enum {
+    GM_LOAD_STATE_NONE,
     GM_LOAD_STATE_SETUP, // valid for use
     GM_LOAD_STATE_UNLOADED,
     GM_LOAD_STATE_UNLOADING,
     GM_LOAD_STATE_LOADING,
     GM_LOAD_STATE_LOADED, // valid for use
-    GM_LOAD_STATE_FAILED
 } gm_load_state_t;
 
 typedef enum {
@@ -168,7 +171,6 @@ static void arq_icon_callback_load(u32 arq_request_ptr) {
 }
 
 static void arq_banner_callback_setup(u32 arq_request_ptr) {
-    OSReport("CALLBACK arq_banner_callback_setup\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_banner_t *banner = (gm_banner_t*)req;
 
@@ -176,7 +178,6 @@ static void arq_banner_callback_setup(u32 arq_request_ptr) {
 }
 
 static void arq_banner_callback_unload(u32 arq_request_ptr) {
-    OSReport("CALLBACK arq_banner_callback_unload\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_banner_t *banner = (gm_banner_t*)req;
 
@@ -185,7 +186,6 @@ static void arq_banner_callback_unload(u32 arq_request_ptr) {
 }
 
 static void arq_banner_callback_load(u32 arq_request_ptr) {
-    OSReport("CALLBACK arq_banner_callback_load\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_banner_t *banner = (gm_banner_t*)req;
 
@@ -193,10 +193,55 @@ static void arq_banner_callback_load(u32 arq_request_ptr) {
 }
 
 // asset offload helpers
-// void gm_icon_setup(gm_icon_t *icon, u32 aram_offset) // init time only
-// void gm_icon_unload // init time only
-// void gm_icon_load // runtime funcs
-// void gm_icon_free // runtime funcs
+void gm_icon_setup(gm_icon_t *icon, u32 aram_offset) {
+    OSReport("Setting up icon\n");
+    icon->aram_offset = aram_offset;
+    icon->state = GM_LOAD_STATE_SETUP;
+
+    ARQRequest *req = &icon->req;
+    u32 owner = make_type('I', 'X', 'X', 'S');
+    u32 type = ARAM_DIR_MRAM_TO_ARAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = (u32)icon->buf->data;
+    u32 dest = aram_offset;
+    u32 length = ICON_PIXELDATA_LEN;
+
+    dolphin_ARQPostRequest(req, owner, type, priority, source, dest, length, &arq_icon_callback_setup);
+}
+
+void gm_icon_setup_unload(gm_icon_t *icon, u32 aram_offset) {
+    icon->aram_offset = aram_offset;
+    icon->state = GM_LOAD_STATE_UNLOADING;
+
+    ARQRequest *req = &icon->req;
+    u32 owner = make_type('I', 'C', 'O', 'U');
+    u32 type = ARAM_DIR_MRAM_TO_ARAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = (u32)icon->buf->data;
+    u32 dest = aram_offset;
+    u32 length = ICON_PIXELDATA_LEN;
+
+    dolphin_ARQPostRequest(req, owner, type, priority, source, dest, length, &arq_icon_callback_unload);
+}
+
+void gm_icon_load(gm_icon_t *icon) {
+    icon->state = GM_LOAD_STATE_LOADING;
+
+    ARQRequest *req = &icon->req;
+    u32 owner = make_type('I', 'C', 'O', 'L');
+    u32 type = ARAM_DIR_ARAM_TO_MRAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = icon->aram_offset;
+    u32 dest = (u32)icon->buf->data;
+    u32 length = ICON_PIXELDATA_LEN;
+
+    dolphin_ARQPostRequest(req, owner, type, priority, source, dest, length, &arq_icon_callback_load);
+}
+
+void gm_icon_free(gm_icon_t *icon) {
+    icon->state = GM_LOAD_STATE_UNLOADED;
+    gm_free_icon_buf(icon->buf);
+}
 
 void gm_banner_setup(gm_banner_t *banner, u32 aram_offset) {
     OSReport("Setting up banner\n");
@@ -204,7 +249,7 @@ void gm_banner_setup(gm_banner_t *banner, u32 aram_offset) {
     banner->state = GM_LOAD_STATE_SETUP;
 
     ARQRequest *req = &banner->req;
-    u32 owner = make_type('I', 'C', 'O', 'N');
+    u32 owner = make_type('B', 'X', 'X', 'S');
     u32 type = ARAM_DIR_MRAM_TO_ARAM;
     u32 priority = ARQ_PRIORITY_LOW;
     u32 source = (u32)banner->buf->data;
@@ -219,7 +264,7 @@ void gm_banner_setup_unload(gm_banner_t *banner, u32 aram_offset) {
     banner->state = GM_LOAD_STATE_UNLOADING;
 
     ARQRequest *req = &banner->req;
-    u32 owner = make_type('I', 'C', 'O', 'N');
+    u32 owner = make_type('I', 'X', 'X', 'U');
     u32 type = ARAM_DIR_MRAM_TO_ARAM;
     u32 priority = ARQ_PRIORITY_LOW;
     u32 source = (u32)banner->buf->data;
@@ -233,7 +278,7 @@ void gm_banner_load(gm_banner_t *banner) {
     banner->state = GM_LOAD_STATE_LOADING;
 
     ARQRequest *req = &banner->req;
-    u32 owner = make_type('I', 'C', 'O', 'N');
+    u32 owner = make_type('I', 'X', 'X', 'L');
     u32 type = ARAM_DIR_ARAM_TO_MRAM;
     u32 priority = ARQ_PRIORITY_LOW;
     u32 source = banner->aram_offset;
@@ -263,6 +308,65 @@ void gm_init_heap() {
     // Initialise our pmalloc
 	pmalloc_init(pm);
 	pmalloc_addblock(pm, &gm_heap_buffer[0], sizeof(gm_heap_buffer));
+}
+
+// png
+static void *ok_gm_alloc(void *user_data, size_t size) {
+    (void)user_data;
+    return pmalloc_malloc(pm, size);
+}
+
+static void ok_gm_free(void *user_data, void *memory) {
+    (void)user_data;
+    pmalloc_free(pm, memory);
+}
+
+const ok_png_allocator OK_PNG_GM_ALLOCATOR = {
+    .alloc = ok_gm_alloc,
+    .free = ok_gm_free,
+    .image_alloc = NULL,
+};
+
+typedef struct {
+    uint8_t *data;
+    size_t size;
+    size_t position;
+} ok_mem_state_t;
+static ok_mem_state_t ok_mem_state;
+
+static size_t ok_mem_read(void *user_data, uint8_t *buffer, size_t length) {
+    (void)user_data;
+    ok_mem_state_t *state = &ok_mem_state;
+    if (state->position + length > state->size) {
+        length = state->size - state->position;  // Adjust length to prevent overflow
+    }
+    memcpy(buffer, state->data + state->position, length);
+    state->position += length;
+    return length;
+}
+
+static bool ok_mem_seek(void *user_data, long count) {
+    (void)user_data;
+    ok_mem_state_t *state = &ok_mem_state;
+    if (state->position + count > state->size || state->position + count < 0) {
+        return false;  // Out of bounds
+    }
+    state->position += count;
+    return true;
+}
+
+static const ok_png_input OK_PNG_MEM_INPUT = {
+    .read = ok_mem_read,
+    .seek = ok_mem_seek,
+};
+
+ok_png gm_png_decode(void *file_buf, size_t file_size) {
+    ok_mem_state.data = file_buf;
+    ok_mem_state.size = file_size;
+    ok_mem_state.position = 0;
+
+    ok_png png = ok_png_read_from_input(OK_PNG_COLOR_FORMAT_RGBA, OK_PNG_MEM_INPUT, file_buf, OK_PNG_GM_ALLOCATOR, NULL);
+    return png;
 }
 
 // HELPERS
@@ -479,7 +583,61 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
 
 // returns amount of space used in aram
 static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
-    return false;
+    // split path and add png extension
+    char icon_path[128];
+    strcpy(icon_path, "/Animal Crossing (USA).png"); // test only
+#if 0
+    strcpy(icon_path, entry->path);
+    char *ext = strrchr(icon_path, '.');
+    if (ext == NULL) return false;
+    strcpy(ext, ".png");
+#endif
+
+    // load the icon
+    dvd_custom_open(icon_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
+    file_status_t *status = dvd_custom_status();
+    if (status == NULL || status->result != 0) {
+        OSReport("ERROR: could not open icon file\n");
+        return false;
+    }
+
+    // allocate file buffer
+    u32 file_size = (u32)__builtin_bswap64(*(u64*)(&status->fsize));
+    file_size += 31;
+    file_size &= 0xffffffe0;
+    void *file_buf = gm_malloc(file_size);
+
+    // read
+    dvd_threaded_read(file_buf, file_size, 0, status->fd);
+    dvd_custom_close(status->fd);
+
+    ok_png png = gm_png_decode(file_buf, file_size);
+    if (png.error_code != OK_PNG_SUCCESS) {
+        OSReport("ERROR: could not decode icon file\n");
+        return false;
+    }
+
+    OSReport("PNG: %d x %d\n", png.width, png.height);
+    gm_free(file_buf);
+
+    entry->asset.icon.state = GM_LOAD_STATE_LOADING;
+    void *icon_ptr = gm_get_icon_buf();
+    if (icon_ptr == NULL) {
+        OSReport("ERROR: could not allocate memory\n");
+        return false;
+    }
+
+    Metaphrasis_convertBufferToRGB5A3((uint32_t*)png.data, (uint32_t*)icon_ptr, png.width, png.height);
+    pmalloc_free(pm, png.data);
+
+    entry->asset.icon.buf = icon_ptr;
+    if (force_unload) {
+        gm_icon_setup_unload(&entry->asset.icon, aram_offset);
+    } else {
+        gm_icon_setup(&entry->asset.icon, aram_offset);
+    }
+
+    return true;
 }
 
 void gm_load_assets() {
@@ -502,20 +660,23 @@ void gm_load_assets() {
                 OSReport("Failed to load banner %s\n", entry->path);
                 continue;
             }
+            aram_offset += BNR_PIXELDATA_LEN;
 
-            // // load the icon
-            // bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
-            // if (!icon_loaded) {
-            //     OSReport("Failed to load icon %s\n", entry->path);
-            //     continue;
-            // }
+            // load the icon
+            bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
+            if (!icon_loaded) {
+                OSReport("Failed to load icon %s\n", entry->path);
+                continue;
+            }
+            aram_offset += ICON_PIXELDATA_LEN;
         } else {
-            // // load the icon
-            // bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
-            // if (!icon_loaded) {
-            //     OSReport("Failed to load icon %s\n", entry->path);
-            //     continue;
-            // }
+            // load the icon
+            bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
+            if (!icon_loaded) {
+                OSReport("Failed to load icon %s\n", entry->path);
+                continue;
+            }
+            aram_offset += ICON_PIXELDATA_LEN;
         }
     }
 }
