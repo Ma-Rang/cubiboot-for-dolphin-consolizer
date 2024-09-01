@@ -14,6 +14,7 @@
 #include "reloc.h"
 #include "menu.h"
 
+#include "dolphin_arq.h"
 #include "flippy_sync.h"
 #include "filebrowser.h"
 #include "games.h"
@@ -256,9 +257,11 @@ __attribute_used__ void mod_cube_anim() {
 }
 
 __attribute_used__ void pre_thread_init() {
+    dolphin_ARAMInit();
     orig_thread_init();
     if (!start_passthrough_game) {
-        gm_start_thread();
+        gm_init_heap();
+        gm_start_thread("/");
     }
 }
 
@@ -350,11 +353,6 @@ __attribute_used__ u32 bs2tick() {
         completed_time = gettime();
     }
 
-#ifdef TEST_SKIP_ANIMATION
-    return STATE_COVER_OPEN;
-#endif
-    // return STATE_WAIT_LOAD;
-
     if (start_passthrough_game) {
         if (postboot_delay_ms) {
             u64 elapsed = diff_msec(completed_time, gettime());
@@ -371,6 +369,10 @@ __attribute_used__ u32 bs2tick() {
     if (*main_menu_id >= 3) {
         return STATE_START_GAME;
     }
+
+#ifdef TEST_SKIP_ANIMATION
+    return STATE_COVER_OPEN;
+#endif
 
     // TODO: allow the user to decide if they want to logo to play
     return STATE_NO_DISC;

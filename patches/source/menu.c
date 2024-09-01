@@ -11,7 +11,9 @@
 #include "usbgecko.h"
 #include "menu.h"
 #include "grid.h"
-#include "filebrowser.h"
+#include "games.h"
+
+#include "dolphin_dvd.h"
 
 #include "dol_tex_bin.h"
 #include "font.h"
@@ -166,6 +168,7 @@ __attribute_data__ GXColorS10 *menu_color_empty_sel;
 
 __attribute_data__ model global_textured_icon = {};
 __attribute_data__ model global_empty_icon = {};
+__attribute_data__ BNR global_start_banner = {};
 
 // pointers
 model *textured_icon = &global_textured_icon;
@@ -195,6 +198,12 @@ __attribute_used__ void custom_gameselect_init() {
     // default banner
     *banner_pointer = (u32)&default_opening_bin[0];
     *banner_ready = 1;
+
+    // start banner
+    global_start_banner.magic[0] = 'B';
+    global_start_banner.magic[1] = 'N';
+    global_start_banner.magic[2] = 'R';
+    global_start_banner.magic[3] = '1';    
 
     // menu setup
     menu_blob = *ptr_menu_blob;
@@ -278,13 +287,21 @@ __attribute_used__ void custom_gameselect_init() {
 int selected_slot = 0;
 int top_line_num = 0;
 
-__attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, bool selected, bool has_texture) {
+__attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, bool selected) {
     f32 sc = pos->scale;
     guVector scale = {sc, sc, sc};
+    bool has_texture = false;
 
-    // game_asset_t *asset = get_game_asset(slot_num);
-    // if (asset == NULL) has_texture = false;
-    has_texture = false; // TEMP HACK
+    gm_file_entry_t *entry = gm_get_game_entry(slot_num);
+    if (entry != NULL) {
+        if (entry->asset.use_banner && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
+            has_texture = true;
+        } else if (entry->asset.icon.state == GM_LOAD_STATE_LOADED) {
+            has_texture = true;
+        } else if (entry->type == GM_FILE_TYPE_PROGRAM) {
+            has_texture = true;
+        }
+    }
 
     model *m = NULL;
     if (has_texture) {
@@ -310,9 +327,6 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
 
     // draw icon
     m->alpha = (u8)((f32)alpha * pos->opacity);
-#if 1
-    draw_model(m);
-#else
     if (has_texture) {
         // cube
         draw_partial(m, &m->data->parts[2]);
@@ -320,8 +334,13 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
 
         // icon
         tex_data *icon_tex = &m->data->tex->dat[1];
-        if (is_dol_slot(slot_num)) {
-            u32 target_texture_data = (u32)&dol_tex_bin[0];
+        if (entry->type == GM_FILE_TYPE_PROGRAM) {
+            u32 target_texture_data = 0;
+            if (entry->asset.icon.state == GM_LOAD_STATE_NONE) {
+                target_texture_data = (u32)&dol_tex_bin[0];
+            } else {
+                target_texture_data = (u32)entry->asset.icon.buf->data;
+            }
 
             s32 desired_offset = (s32)((u32)target_texture_data - (u32)icon_tex);
             icon_tex->offset = desired_offset;
@@ -329,9 +348,7 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
             icon_tex->width = 32;
             icon_tex->height = 32;
         } else {
-            // u32 target_texture_data = (u32)assets[index].icon_rgb5;
-            // u16 *source_texture_data = (u16*)assets[0].banner.pixelData;
-            u16 *source_texture_data = (u16*)asset->banner.pixelData;
+            u16 *source_texture_data = (u16*)entry->asset.banner.buf->data;
             u32 target_texture_data = (u32)source_texture_data;
 
             s32 desired_offset = (s32)((u32)target_texture_data - (u32)icon_tex);
@@ -346,7 +363,6 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
     } else {
         draw_model(m);
     }
-#endif
 
     return;
 }
@@ -500,7 +516,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
                 for (int col = 0; col < 8; col++) {
                     int slot_num = (line_num * 8) + col;
 
-                    bool has_texture = (slot_num < game_backing_count);
+                    // bool has_texture = (slot_num < game_backing_count);
                     bool selected = (slot_num == selected_slot);
 
                     if (selected && pass == 0) continue; // skip selected icon on first pass
@@ -523,7 +539,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
                         pos->scale = 1.3;
                         pos->m[1][3] = real_position_y;
                     }
-                    draw_save_icon(pos, slot_num, alpha_1, selected, has_texture);
+                    draw_save_icon(pos, slot_num, alpha_1, selected);
 
                     C_MTXIdentity(pos->m);
                     pos->m[0][3] = saved_x; // reset x
@@ -537,51 +553,58 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     // arrows
     fix_gameselect_view();
     setup_tex_draw(1, 0, 0);
-    draw_named_tex(make_type('a','r','a','d'), menu_blob, &white, 0x800 - 100, 0); // TODO: y pos anim
+    if (top_line_num > 0) {
+        draw_named_tex(make_type('a','r','a','u'), menu_blob, &white, 0x800 - 80, 0); // TODO: y pos anim
+    }
+    if (number_of_lines > DRAW_TOTAL_ROWS && top_line_num < (number_of_lines - DRAW_TOTAL_ROWS)) {
+        draw_named_tex(make_type('a','r','a','d'), menu_blob, &white, 0x800 - 80, 0); // TODO: y pos anim
+    }
 
     // box
     GXColor top_color = {0x6e, 0x00, 0xb3, 0xc8};
     GXColor bottom_color = {0x80, 0x00, 0x57, 0xb4};
     draw_info_box(0x20f0, 0x560, 0x1230, 0x1640, ui_alpha, &top_color, &bottom_color);
 
-    // game_asset_t *asset = get_game_asset(selected_slot);
-    game_asset_t *asset = NULL;
-    if (asset != NULL && selected_slot < game_backing_count) {
-        if (asset->game_id[3] == 'J') switch_lang_jpn();
+    gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+    if (entry != NULL && selected_slot < game_backing_count) {
+        if (entry->extra.game_id[3] == 'J') switch_lang_jpn();
         else switch_lang_eng();
 
-#if 0
         // info
-        draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, asset->banner.desc->fullGameName, 0x1f);
-        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, asset->banner.desc->description, 0x1f);
-#endif
-
-        draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, "Some text!", 0x1f);
-        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, "Hello", 0x1f);
+        draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, entry->desc.fullGameName, 0x1f);
+        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, entry->desc.description, 0x1f);
 
         switch_lang_eng();
-        if (is_dol_slot(selected_slot)) {
+        if (entry->type == GM_FILE_TYPE_PROGRAM) {
             // game source
             switch_lang_eng();
             draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
             draw_text("DOL", 20, 125, 540, &white);
 
-            // icon image
-            setup_tex_draw(1, 0, 1);
-            icon_texture.offset = (s32)((u32)&dol_tex_bin[0] - (u32)&icon_texture);
-            draw_blob_tex(make_type('i','c','0','0'), menu_blob, &white, &icon_texture);
-        } else {
+            if (entry->asset.icon.state == GM_LOAD_STATE_NONE) {
+                // icon image
+                setup_tex_draw(1, 0, 1);
+                icon_texture.offset = (s32)((u32)&dol_tex_bin[0] - (u32)&icon_texture);
+                draw_blob_tex(make_type('i','c','0','0'), menu_blob, &white, &icon_texture);
+            } else if (entry->asset.icon.state == GM_LOAD_STATE_LOADED) {
+                // icon image
+                setup_tex_draw(1, 0, 1);
+                // TODO: handle format changes for compressed icons
+                icon_texture.offset = (s32)((u32)entry->asset.icon.buf->data - (u32)&icon_texture);
+                draw_blob_tex(make_type('i','c','0','0'), menu_blob, &white, &icon_texture);
+            }
+        } else if (entry->type == GM_FILE_TYPE_GAME) {
             // game source
             switch_lang_eng();
             draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
             draw_text("ISO", 20, 125, 540, &white);
 
-#if 0
-            // banner image
-            setup_tex_draw(1, 0, 1);
-            banner_texture.offset = (s32)((u32)(asset->banner.pixelData) - (u32)&banner_texture);
-            draw_blob_tex(make_type('b','a','n','a'), menu_blob, &white, &banner_texture);
-#endif
+            if (entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
+                // banner image
+                setup_tex_draw(1, 0, 1);
+                banner_texture.offset = (s32)((u32)(entry->asset.banner.buf->data) - (u32)&banner_texture);
+                draw_blob_tex(make_type('b','a','n','a'), menu_blob, &white, &banner_texture);
+            }
         }
         switch_lang_orig();
     }
@@ -594,24 +617,26 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     u8 ui_alpha = alpha_1;
     GXColor white = {0xFF, 0xFF, 0xFF, ui_alpha};
 
-#if 0
-    game_asset_t *asset = get_game_asset(selected_slot);
-    if (asset->game_id[3] == 'J') switch_lang_jpn();
+    gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+    if (entry->extra.game_id[3] == 'J') switch_lang_jpn();
     else switch_lang_eng();
 
-    if (!is_dol_slot(selected_slot)) {
+    if (entry->type == GM_FILE_TYPE_GAME && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
         // game banner
         setup_tex_draw(1, 0, 1);
-        banner_texture.offset = (s32)((u32)(asset->banner.pixelData) - (u32)&banner_texture);
+        banner_texture.offset = (s32)((u32)(entry->asset.banner.buf->data) - (u32)&banner_texture);
         draw_blob_tex(make_type('b','a','n','a'), game_blob_b, &white, &banner_texture);
     }
 
     // game info
     prep_text_mode();
-    draw_blob_text(make_type('t','i','t','l'), game_blob_b, &white, asset->banner.desc->fullGameName, 0x40);
-    draw_blob_text(make_type('m','a','k','r'), game_blob_b, &white, asset->banner.desc->fullCompany, 0x40);
-    draw_blob_text_long(make_type('i','n','f','o'), game_blob_b, &white, asset->banner.desc->description, 0x80);
-#endif
+    draw_blob_text(make_type('t','i','t','l'), game_blob_b, &white, entry->desc.fullGameName, 0x40);
+    if (entry->type == GM_FILE_TYPE_GAME) {
+        draw_blob_text(make_type('m','a','k','r'), game_blob_b, &white, entry->desc.fullCompany, 0x40);
+        draw_blob_text_long(make_type('i','n','f','o'), game_blob_b, &white, entry->desc.description, 0x80);
+    } else {
+        draw_blob_text(make_type('m','a','k','r'), game_blob_b, &white, entry->desc.description, 0x40);
+    }
 
     // press start anim
     draw_start_anim(ui_alpha); // TODO: fix alpha timing
@@ -667,6 +692,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     update_icon_positions();
     grid_update_icon_positions();
 
+    // TODO: this code is so annoying haha... I should add a direction var
     // TODO: only works with numbers that do not divide into 255 (switch to floats?)
     u8 transition_step = 14;
     if (rmode->viTVMode >> 2 != VI_NTSC) transition_step = 16;
@@ -722,12 +748,11 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         if (selected_slot < game_backing_count && !in_submenu_transition) {
             in_submenu_transition = true;
             current_gameselect_state = SUBMENU_GAMESELECT_START;
-#if 0
-            game_asset_t *asset = get_game_asset(selected_slot);
-            if (asset != NULL) {
-                *banner_pointer = (u32)&asset->banner; // banner buf
+            gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+            if (entry != NULL) {
+                *banner_pointer = (u32)&global_start_banner; // banner buf
+                memcpy(&global_start_banner.desc[0], &entry->desc, sizeof(BNRDesc)); // copy desc
             }
-#endif
 
             Jac_PlaySe(SOUND_SUBMENU_ENTER);
             setup_gameselect_anim();
@@ -737,10 +762,16 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         }
     }
 
+    if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
+        extern void gm_debug_func();
+        gm_debug_func();
+    }
+
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();
         Jac_PlaySe(SOUND_MENU_FINAL);
-        //strcpy(boot_path, get_game_path(selected_slot));
+        gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+        strcpy(boot_path, entry->path);
         *bs2start_ready = 1;
     }
 
@@ -773,7 +804,8 @@ __attribute_used__ s32 handle_gameselect_inputs() {
                 Jac_PlaySe(SOUND_CARD_MOVE);
                 line_backing_t *line_backing = &browser_lines[selected_slot / 8];
                 if (get_position_after(line_backing) >= DRAW_BOUND_BOTTOM - DRAW_OFFSET_Y - 10) {
-                    if (grid_dispatch_navigate_down() == 0) {
+                    if (gm_can_move() && grid_dispatch_navigate_down() == GRID_MOVE_SUCCESS) {
+                        gm_line_changed(1);
                         selected_slot += 8;
                         top_line_num++;
                     }
@@ -791,7 +823,8 @@ __attribute_used__ s32 handle_gameselect_inputs() {
                 Jac_PlaySe(SOUND_CARD_MOVE);
                 line_backing_t *line_backing = &browser_lines[selected_slot / 8];
                 if (top_line_num != 0 && get_position_after(line_backing) <= DRAW_BOUND_TOP + DRAW_OFFSET_Y - 10) {
-                    if (grid_dispatch_navigate_up() == 0) {
+                    if (gm_can_move() && grid_dispatch_navigate_up() == GRID_MOVE_SUCCESS) {
+                        gm_line_changed(-1);
                         selected_slot -= 8;
                         top_line_num--;
                     }

@@ -15,6 +15,12 @@
 #define DRAW_OFFSET_Y 56
 #define DRAW_TOTAL_ROWS 4
 
+// ????
+// #define GRID_LOAD_MAX_LINES (DRAW_TOTAL_ROWS + 2)
+
+#define GRID_MOVE_SUCCESS 0
+#define GRID_MOVE_FAIL 1
+
 typedef struct {
     int pending_count;
     int direction;
@@ -30,7 +36,6 @@ typedef struct {
     bool moving_in;
 } line_backing_t;
 
-extern int number_of_lines;
 extern line_backing_t browser_lines[];
 
 // helper

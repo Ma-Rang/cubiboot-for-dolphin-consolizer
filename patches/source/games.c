@@ -21,6 +21,7 @@
 #include "attr.h"
 
 #include "dolphin_os.h"
+#include "dolphin_arq.h"
 #include "dolphin_dvd.h"
 #include "flippy_sync.h"
 #include "dvd_threaded.h"
@@ -30,10 +31,17 @@
 
 #include "games.h"
 #include "grid.h"
+#include "menu.h"
 #include "time.h"
 
+#define PRELOAD_LINE_COUNT 2
+#define ASSETS_PER_LINE 8
+#define ASSETS_PER_PAGE (ASSETS_PER_LINE * DRAW_TOTAL_ROWS)
+#define ASSETS_INITIAL_COUNT (ASSETS_PER_PAGE + (PRELOAD_LINE_COUNT * ASSETS_PER_LINE)) // assuming we start at the top
+#define ASSET_BUFFER_COUNT 128
+
 // Globals
-int number_of_lines = 8;
+int number_of_lines = 4;
 int game_backing_count = 0;
 
 static OSMutex game_enum_mutex_obj;
@@ -46,12 +54,18 @@ __attribute_data_lowmem__ static gm_path_entry_t *__gm_sorted_path_list[2000];
 static gm_file_entry_t *gm_entry_backing[2000];
 static u32 gm_entry_count = 0;
 
-__attribute_data_lowmem__ static gm_icon_buf_t gm_icon_pool[64];
-__attribute_data_lowmem__ static gm_banner_buf_t gm_banner_pool[64];
+gm_file_entry_t *gm_get_game_entry(int index) {
+    if (index >= gm_entry_count) return NULL;
+    return gm_entry_backing[index];
+}
+
+__attribute_aligned_data_lowmem__ static gm_icon_buf_t gm_icon_pool[ASSET_BUFFER_COUNT] = {};
+__attribute_aligned_data_lowmem__ static gm_banner_buf_t gm_banner_pool[ASSET_BUFFER_COUNT] = {};
 
 static inline gm_icon_buf_t *gm_get_icon_buf() {
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < ASSET_BUFFER_COUNT; i++) {
         if (gm_icon_pool[i].used == 0) {
+            OSReport("Allocating icon buffer\n");
             gm_icon_pool[i].used = 1;
             return &gm_icon_pool[i];
         }
@@ -61,11 +75,21 @@ static inline gm_icon_buf_t *gm_get_icon_buf() {
 }
 
 static inline void gm_free_icon_buf(gm_icon_buf_t *buf) {
+    if (buf == NULL) return;
     buf->used = 0;
 }
 
+static int gm_count_icon_buf() {
+    int count = 0;
+    for (int i = 0; i < ASSET_BUFFER_COUNT; i++) {
+        if (gm_icon_pool[i].used == 1) count++;
+    }
+
+    return count;
+}
+
 static inline gm_banner_buf_t *gm_get_banner_buf() {
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < ASSET_BUFFER_COUNT; i++) {
         if (gm_banner_pool[i].used == 0) {
             gm_banner_pool[i].used = 1;
             return &gm_banner_pool[i];
@@ -76,52 +100,74 @@ static inline gm_banner_buf_t *gm_get_banner_buf() {
 }
 
 static inline void gm_free_banner_buf(gm_banner_buf_t *buf) {
+    if (buf == NULL) return;
     buf->used = 0;
+}
+
+static int gm_count_banner_buf() {
+    int count = 0;
+    for (int i = 0; i < ASSET_BUFFER_COUNT; i++) {
+        if (gm_banner_pool[i].used == 1) count++;
+    }
+
+    return count;
 }
 
 // TODO: swap the icon/banner callback with req->owner checks
 static void arq_icon_callback_setup(u32 arq_request_ptr) {
+    // OSReport("CALLBACK arq_icon_callback_setup\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_icon_t *icon = (gm_icon_t*)req;
 
     icon->state = GM_LOAD_STATE_LOADED;
+    DCFlushRange(icon, sizeof(gm_icon_t));
 }
 
 static void arq_icon_callback_unload(u32 arq_request_ptr) {
+    // OSReport("CALLBACK arq_icon_callback_unload\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_icon_t *icon = (gm_icon_t*)req;
 
     icon->state = GM_LOAD_STATE_UNLOADED;
     gm_free_icon_buf(icon->buf);
+    DCFlushRange(icon, sizeof(gm_icon_t));
 }
 
 static void arq_icon_callback_load(u32 arq_request_ptr) {
+    // OSReport("CALLBACK arq_icon_callback_load\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_icon_t *icon = (gm_icon_t*)req;
 
     icon->state = GM_LOAD_STATE_LOADED;
+    DCFlushRange(icon, sizeof(gm_icon_t));
 }
 
 static void arq_banner_callback_setup(u32 arq_request_ptr) {
+    // OSReport("CALLBACK arq_banner_callback_setup\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_banner_t *banner = (gm_banner_t*)req;
 
     banner->state = GM_LOAD_STATE_LOADED;
+    DCFlushRange(banner, sizeof(gm_banner_t));
 }
 
 static void arq_banner_callback_unload(u32 arq_request_ptr) {
+    // OSReport("CALLBACK arq_banner_callback_unload\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_banner_t *banner = (gm_banner_t*)req;
 
     banner->state = GM_LOAD_STATE_UNLOADED;
     gm_free_banner_buf(banner->buf);
+    DCFlushRange(banner, sizeof(gm_banner_t));
 }
 
 static void arq_banner_callback_load(u32 arq_request_ptr) {
+    // OSReport("CALLBACK arq_banner_callback_load\n");
     ARQRequest *req = (ARQRequest*)arq_request_ptr;
     gm_banner_t *banner = (gm_banner_t*)req;
 
     banner->state = GM_LOAD_STATE_LOADED;
+    DCFlushRange(banner, sizeof(gm_banner_t));
 }
 
 // asset offload helpers
@@ -157,7 +203,17 @@ void gm_icon_setup_unload(gm_icon_t *icon, u32 aram_offset) {
 }
 
 void gm_icon_load(gm_icon_t *icon) {
+    // OSReport("Loading icon %d\n", icon->state);
+    if (icon->state == GM_LOAD_STATE_NONE || icon->state == GM_LOAD_STATE_LOADED) return;
     icon->state = GM_LOAD_STATE_LOADING;
+
+    gm_icon_buf_t *icon_ptr = gm_get_icon_buf();
+    if (icon_ptr == NULL) {
+        OSReport("ERROR: could not allocate memory\n");
+        return;
+    }
+    icon->buf = icon_ptr;
+    DCFlushRange(icon, sizeof(gm_icon_t));
 
     ARQRequest *req = &icon->req;
     u32 owner = make_type('I', 'C', 'O', 'L');
@@ -171,12 +227,22 @@ void gm_icon_load(gm_icon_t *icon) {
 }
 
 void gm_icon_free(gm_icon_t *icon) {
-    icon->state = GM_LOAD_STATE_UNLOADED;
+    if (icon->state == GM_LOAD_STATE_NONE) return;
+    
+    if (icon->state == GM_LOAD_STATE_LOADING) {
+        icon->schedule_free = true;
+        return;
+    }
+
+    icon->state = GM_LOAD_STATE_UNLOADING;
+    // memset(icon->buf->data, 0, ICON_PIXELDATA_LEN); // test only
     gm_free_icon_buf(icon->buf);
+    icon->buf = NULL;
+    icon->state = GM_LOAD_STATE_UNLOADED;
 }
 
 void gm_banner_setup(gm_banner_t *banner, u32 aram_offset) {
-    OSReport("Setting up banner\n");
+    // OSReport("Setting up banner\n");
     banner->aram_offset = aram_offset;
     banner->state = GM_LOAD_STATE_SETUP;
 
@@ -207,7 +273,17 @@ void gm_banner_setup_unload(gm_banner_t *banner, u32 aram_offset) {
 }
 
 void gm_banner_load(gm_banner_t *banner) {
+    // OSReport("Loading banner %d\n", banner->state);
+    if (banner->state == GM_LOAD_STATE_NONE || banner->state == GM_LOAD_STATE_LOADED) return;
     banner->state = GM_LOAD_STATE_LOADING;
+
+    gm_banner_buf_t *banner_ptr = gm_get_banner_buf();
+    if (banner_ptr == NULL) {
+        OSReport("ERROR: could not allocate memory\n");
+        return;
+    }
+    banner->buf = banner_ptr;
+    DCFlushRange(banner, sizeof(gm_banner_t));
 
     ARQRequest *req = &banner->req;
     u32 owner = make_type('I', 'X', 'X', 'L');
@@ -221,8 +297,18 @@ void gm_banner_load(gm_banner_t *banner) {
 }
 
 void gm_banner_free(gm_banner_t *banner) {
-    banner->state = GM_LOAD_STATE_UNLOADED;
+    if (banner->state == GM_LOAD_STATE_NONE || banner->state == GM_LOAD_STATE_UNLOADING) return;
+    
+    if (banner->state == GM_LOAD_STATE_LOADING) {
+        banner->schedule_free = true;
+        return;
+    }
+
+    banner->state = GM_LOAD_STATE_UNLOADING;
+    // memset(banner->buf->data, 0, BNR_PIXELDATA_LEN); // test only
     gm_free_banner_buf(banner->buf);
+    banner->buf = NULL;
+    banner->state = GM_LOAD_STATE_UNLOADED;
 }
 
 // HEAP
@@ -405,7 +491,7 @@ gm_list_info gm_list_files(const char *target_dir) {
         __gm_sorted_path_list[path_entry_count] = entry;
         path_entry_count++;
 
-        if (path_entry_count >= 2000) {
+        if (path_entry_count >= 1920) {
             OSReport("WARNING: Too many files in directory\n");
             break;
         }
@@ -437,6 +523,7 @@ void gm_check_headers(int path_count) {
         // OSReport("Checking header %s [%d]\n", entry->path, entry->type);
 
         if (entry->type == GM_FILE_TYPE_GAME) {
+            OSReport("Game Check %d\n", i);
             // check if the banner file exists
             dolphin_game_into_t info = get_game_info(entry->path);
             if (!info.valid) continue;
@@ -444,6 +531,7 @@ void gm_check_headers(int path_count) {
 
             // create a new entry
             gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
+            memset(backing, 0, sizeof(gm_file_entry_t));
             memcpy(backing->path, entry->path, sizeof(backing->path));
             backing->type = GM_FILE_TYPE_GAME;
 
@@ -460,8 +548,14 @@ void gm_check_headers(int path_count) {
 
             // create a new entry
             gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
+            memset(backing, 0, sizeof(gm_file_entry_t));
             memcpy(backing->path, entry->path, sizeof(backing->path));
             backing->type = entry->type;
+
+            // get the basename
+            char *base = strrchr(entry->path, '/');
+            strcpy(backing->desc.fullGameName, base + 1);
+            strcpy(backing->desc.description, "Homebrew Program");
 
             // set heap pointer
             gm_entry_backing[gm_entry_count] = backing;
@@ -481,7 +575,7 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
     if (entry->extra.dvd_bnr_offset == 0) return false;
 
     // load the banner
-    dvd_custom_open(entry->path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
+    dvd_custom_open(entry->path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLESPEEDEMU);
     file_status_t *status = dvd_custom_status();
     if (status == NULL || status->result != 0) {
         OSReport("ERROR: could not open file\n");
@@ -493,13 +587,14 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
     dvd_custom_close(status->fd);
 
     entry->asset.banner.state = GM_LOAD_STATE_LOADING;
-    void *banner_ptr = gm_get_banner_buf();
+    gm_banner_buf_t *banner_ptr = gm_get_banner_buf();
     if (banner_ptr == NULL) {
         OSReport("ERROR: could not allocate memory\n");
         return false;
     }
 
-    memcpy(banner_ptr, &banner_buffer.pixelData[0], BNR_PIXELDATA_LEN);
+    memcpy(&banner_ptr->data[0], &banner_buffer.pixelData[0], BNR_PIXELDATA_LEN);
+    DCFlushRange(&banner_ptr->data[0], BNR_PIXELDATA_LEN);
     entry->asset.banner.buf = banner_ptr;
     if (force_unload) {
         gm_banner_setup_unload(&entry->asset.banner, aram_offset);
@@ -517,19 +612,16 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
 static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
     // split path and add png extension
     char icon_path[128];
-    strcpy(icon_path, "/Animal Crossing (USA).png"); // test only
-#if 0
     strcpy(icon_path, entry->path);
     char *ext = strrchr(icon_path, '.');
     if (ext == NULL) return false;
     strcpy(ext, ".png");
-#endif
 
     // load the icon
     dvd_custom_open(icon_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
     file_status_t *status = dvd_custom_status();
     if (status == NULL || status->result != 0) {
-        OSReport("ERROR: could not open icon file\n");
+        // OSReport("ERROR: could not open icon file\n");
         return false;
     }
 
@@ -553,13 +645,14 @@ static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unl
     gm_free(file_buf);
 
     entry->asset.icon.state = GM_LOAD_STATE_LOADING;
-    void *icon_ptr = gm_get_icon_buf();
+    gm_icon_buf_t *icon_ptr = gm_get_icon_buf();
     if (icon_ptr == NULL) {
         OSReport("ERROR: could not allocate memory\n");
         return false;
     }
 
-    Metaphrasis_convertBufferToRGB5A3((uint32_t*)png.data, (uint32_t*)icon_ptr, png.width, png.height);
+    Metaphrasis_convertBufferToRGB5A3((uint32_t*)png.data, (uint32_t*)&icon_ptr->data[0], png.width, png.height);
+    DCFlushRange(&icon_ptr->data[0], ICON_PIXELDATA_LEN);
     pmalloc_free(pm, png.data);
 
     entry->asset.icon.buf = icon_ptr;
@@ -575,12 +668,13 @@ static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unl
 void gm_load_assets() {
     u32 aram_offset = (1 * 1024 * 1024); // 1MB mark
 
+    // TODO: do a dynamic check for the amount of space used in ARAM
     for (int i = 0; i < gm_entry_count; i++) {
         gm_file_entry_t *entry = gm_entry_backing[i];
         OSReport("[%d] Loading assets %s (%d)\n", i, entry->path, entry->type);
 
         bool force_unload = false;
-        if (i >= 48) {
+        if (i >= ASSETS_INITIAL_COUNT) {
             force_unload = true;
         }
 
@@ -590,58 +684,175 @@ void gm_load_assets() {
             bool bnr_loaded = gm_load_banner(entry, aram_offset, force_unload);
             if (!bnr_loaded) {
                 OSReport("Failed to load banner %s\n", entry->path);
-                continue;
             }
             aram_offset += BNR_PIXELDATA_LEN;
 
             // load the icon
             bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
             if (!icon_loaded) {
-                OSReport("Failed to load icon %s\n", entry->path);
-                continue;
+                // OSReport("Failed to load icon %s\n", entry->path);
+                entry->asset.use_banner = true;
+            } else {
+                entry->asset.use_banner = false;
             }
             aram_offset += ICON_PIXELDATA_LEN;
         } else {
             // load the icon
             bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
             if (!icon_loaded) {
-                OSReport("Failed to load icon %s\n", entry->path);
+                // OSReport("Failed to load icon %s\n", entry->path);
                 continue;
             }
+            entry->asset.use_banner = false;
             aram_offset += ICON_PIXELDATA_LEN;
+        }
+
+        game_backing_count = i + 1; // show the next icon
+    }
+} 
+
+void gm_line_load(int line_num) {
+    // OSReport("Line load %d\n", line_num);
+
+    for (int i = 0; i < ASSETS_PER_LINE; i++) {
+        int index = (line_num * ASSETS_PER_LINE) + i;
+        if (index >= gm_entry_count) break;
+
+        gm_file_entry_t *entry = gm_entry_backing[index];
+        if (entry->type == GM_FILE_TYPE_GAME) {
+            gm_icon_load(&entry->asset.icon);
+            gm_banner_load(&entry->asset.banner);
+        } else {
+            gm_icon_load(&entry->asset.icon);
         }
     }
 }
 
-static bool first = true;
-void gm_start_thread() {
-    if (first) {
-        gm_init_heap();
-        first = false;
+void gm_line_free(int line_num) {
+    // OSReport("Line free %d\n", line_num);
+
+    for (int i = 0; i < ASSETS_PER_LINE; i++) {
+        int index = (line_num * ASSETS_PER_LINE) + i;
+        if (index >= gm_entry_count) break;
+
+        gm_file_entry_t *entry = gm_entry_backing[index];
+        if (entry->type == GM_FILE_TYPE_GAME) {
+            // OSReport("Freeing assets %s\n", entry->path);
+            gm_icon_free(&entry->asset.icon);
+            gm_banner_free(&entry->asset.banner);
+        } else {
+            gm_icon_free(&entry->asset.icon);
+        }
     }
-
-    // Start the thread
-    // pass
-
-    gm_list_info list_info = gm_list_files("/");
-    gm_sort_files(list_info.num_paths);
-    gm_check_headers(list_info.num_paths);
-    gm_load_assets();
-    grid_setup_func();
 }
 
-// TODO: thread
+void gm_line_changed(int delta) {
+    // OSReport("Line changed %+d\n", delta);
 
-// // match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
-// static u8 thread_obj[0x310];
-// static u8 thread_stack[32 * 1024];
-// void start_file_enum() {
-//     u32 thread_stack_size = sizeof(thread_stack);
-//     void *thread_stack_top = thread_stack + thread_stack_size;
-//     s32 thread_priority = DEFAULT_THREAD_PRIO + 3;
+    // int previous_line_num = top_line_num;
+    int new_line_num = top_line_num + delta;
 
-//     OSInitMutex(game_enum_mutex);
+    // two slots should be processed, one to load and one to unload
 
-//     dolphin_OSCreateThread(&thread_obj[0], file_enum_worker, 0, thread_stack_top, thread_stack_size, thread_priority, 0);
-//     dolphin_OSResumeThread(&thread_obj[0]);
-// }
+    // get number of lines to process
+    if (delta < 0) {
+        int load_line = new_line_num - PRELOAD_LINE_COUNT + 1;
+        if (load_line >= 0) {
+            // load
+            OSReport("Load line %d\n", load_line);
+            gm_line_load(load_line);
+        }
+
+        // unload from the bottom
+        int unload_line = new_line_num + DRAW_TOTAL_ROWS + PRELOAD_LINE_COUNT;
+        if (unload_line < number_of_lines) {
+            // unload
+            OSReport("Unload line %d\n", unload_line);
+            gm_line_free(unload_line);
+        }
+    } else if (delta > 0) {
+        int load_line = new_line_num + DRAW_TOTAL_ROWS + PRELOAD_LINE_COUNT - 1;
+        if (load_line < number_of_lines) {
+            // load
+            OSReport("Load line %d\n", load_line);
+            gm_line_load(load_line);
+        }
+
+        // unload from the top
+        int unload_line = new_line_num - PRELOAD_LINE_COUNT;
+        if (unload_line >= 0) {
+            // unload
+            OSReport("Unload line %d\n", unload_line);
+            gm_line_free(unload_line);
+        }
+    }
+
+    int icon_buf_count = gm_count_icon_buf();
+    int banner_buf_count = gm_count_banner_buf();
+
+    OSReport("icon buf count = %d\n", icon_buf_count);
+    OSReport("banner buf count = %d\n", banner_buf_count);
+}
+
+// so grid can check if load/unload is possible
+bool gm_can_move() {
+    return true;
+}
+
+void gm_debug_func() {
+    int icon_buf_count = gm_count_icon_buf();
+    int banner_buf_count = gm_count_banner_buf();
+
+    OSReport("icon buf count = %d\n", icon_buf_count);
+    OSReport("banner buf count = %d\n", banner_buf_count);
+
+    for (int i = 0; i < gm_entry_count; i++) {
+        gm_file_entry_t *entry = gm_entry_backing[i];
+        OSReport("Entry %d: %s\n", i, entry->path);
+
+        if (entry->type == GM_FILE_TYPE_GAME) {
+            // banner buf
+            OSReport("Banner: %p (%d)\n", entry->asset.banner.buf, entry->asset.banner.state);
+        }
+    }
+}
+
+void gm_setup_grid(int line_count, bool initial) {
+    number_of_lines = (line_count + 7) >> 3;
+    if (number_of_lines < 4) {
+        number_of_lines = 4;
+    }
+
+    if (initial) {
+        // Setup the grid
+        grid_setup_func();
+    }
+}
+
+void *gm_thread_worker(void* param) {
+    const char *target = param;
+    gm_list_info list_info = gm_list_files(target);
+    gm_setup_grid(list_info.num_paths, true);
+    gm_sort_files(list_info.num_paths);
+    gm_check_headers(list_info.num_paths);
+    gm_setup_grid(gm_entry_count, false);
+    gm_load_assets();
+
+    // pmalloc_dump_stats(pm);
+    return NULL;
+}
+
+// match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
+static u8 thread_obj[0x310];
+static u8 thread_stack[32 * 1024];
+void gm_start_thread(const char *target) {
+    // Start the thread
+    u32 thread_stack_size = sizeof(thread_stack);
+    void *thread_stack_top = thread_stack + thread_stack_size;
+    s32 thread_priority = DEFAULT_THREAD_PRIO + 3;
+
+    OSInitMutex(game_enum_mutex);
+
+    dolphin_OSCreateThread(&thread_obj[0], gm_thread_worker, (void*)target, thread_stack_top, thread_stack_size, thread_priority, 0);
+    dolphin_OSResumeThread(&thread_obj[0]);
+}

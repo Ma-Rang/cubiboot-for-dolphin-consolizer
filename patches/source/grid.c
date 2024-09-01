@@ -6,6 +6,8 @@
 #include "attr.h"
 
 #include "grid.h"
+#include "menu.h"
+#include "games.h"
 
 // ===============================================================================
 
@@ -18,10 +20,6 @@ bool grid_setup_done = false;
 line_backing_t browser_lines[256]; // 256 lines * 8 slots = 2048 slots
 
 // ===============================================================================
-
-// other vars
-extern int selected_slot;
-extern int top_line_num;
 
 const f32 offset_y = DRAW_OFFSET_Y;
 
@@ -41,7 +39,10 @@ void grid_setup_func() {
     OSReport("browser_lines = %p\n", browser_lines);
     OSReport("number_of_lines = %d\n", number_of_lines);
 
-    // test code
+    // initial
+    selected_slot = START_LINE * 8;
+    top_line_num = START_LINE;
+
     for (int line_num = 0; line_num < number_of_lines; line_num++) {
         line_backing_t *line_backing = &browser_lines[line_num];
         // line_backing->relative_index = line_num;
@@ -53,9 +54,6 @@ void grid_setup_func() {
         if (line_num < START_LINE || line_num >= START_LINE + DRAW_TOTAL_ROWS) {
             line_backing->transparency = 0.0;
         }
-
-        selected_slot = START_LINE * 8;
-        top_line_num = START_LINE;
 
         anim_list_t *anims = &line_backing->anims;
         anims->pending_count = 0;
@@ -99,7 +97,7 @@ int grid_dispatch_navigate_up() {
 
         if (anims->pending_count > 0 && anims->direction == ANIM_DIRECTION_UP) {
             OSReport("ERROR: Pending up anims\n");
-            return 1;
+            return GRID_MOVE_FAIL;
         }
     }
 
@@ -151,7 +149,7 @@ int grid_dispatch_navigate_up() {
         // }
     }
 
-    return 0;
+    return GRID_MOVE_SUCCESS;
 }
 
 int grid_dispatch_navigate_down() {
@@ -176,7 +174,7 @@ int grid_dispatch_navigate_down() {
 
         if (anims->pending_count > 0 && anims->direction == ANIM_DIRECTION_DOWN) {
             OSReport("ERROR: Pending down anims\n");
-            return 1;
+            return GRID_MOVE_FAIL;
         }
     }
 
@@ -245,7 +243,7 @@ int grid_dispatch_navigate_down() {
         }
     }
 
-    return 0;
+    return GRID_MOVE_SUCCESS;
 }
 
 void grid_update_icon_positions() {

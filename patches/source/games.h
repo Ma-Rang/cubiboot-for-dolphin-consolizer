@@ -1,8 +1,10 @@
 #include <gctypes.h>
 
-#include "dolphin_arq.h"
+#include "dolphin_os.h"
 #include "icon.h"
 #include "bnr.h"
+
+#include "decomp_ar.h"
 
 // Backing
 typedef enum {
@@ -21,19 +23,24 @@ typedef enum {
     GM_FILE_TYPE_GAME
 } gm_file_type_t;
 
+#pragma pack(push,1)
 typedef struct {
     u32 used;
+    u32 padding[7];
     u8 data[ICON_PIXELDATA_LEN];
 } gm_icon_buf_t;
 
 typedef struct {
     u32 used;
+    u32 padding[7];
     u8 data[BNR_PIXELDATA_LEN];
-} gm_banner_buf_t;
+} gm_banner_buf_t __attribute__((aligned(32)));
+#pragma pack(pop)
 
 typedef struct {
     ARQRequest req;
     u32 aram_offset;
+    bool schedule_free;
     gm_load_state_t state;
     gm_icon_buf_t *buf;
 } gm_icon_t;
@@ -41,17 +48,20 @@ typedef struct {
 typedef struct {
     ARQRequest req;
     u32 aram_offset;
+    bool schedule_free;
     gm_load_state_t state;
     gm_banner_buf_t *buf;
 } gm_banner_t;
 
 typedef struct {
+    bool use_banner;
     gm_icon_t icon;
     gm_banner_t banner;
 } gm_asset_t;
 
 typedef struct {
     u8 game_id[6];
+    u8 padding;
     u8 dvd_bnr_type;
 	u32 dvd_bnr_offset;
 } gm_extra_t;
@@ -69,4 +79,12 @@ typedef struct {
     gm_file_type_t type;
 } gm_file_entry_t;
 
-void gm_start_thread();
+extern int number_of_lines;
+extern int game_backing_count;
+extern OSMutex *game_enum_mutex;
+
+void gm_init_heap();
+void gm_start_thread(const char *target);
+void gm_line_changed(int delta);
+bool gm_can_move();
+gm_file_entry_t *gm_get_game_entry(int index);

@@ -20,5 +20,6 @@ extern state *cube_state;
 
 // from menu
 extern u32 (*OSDisableInterrupts)();
+extern BOOL (*OSRestoreInterrupts)(BOOL);
 extern void (*VIWaitForRetrace)();
 extern void (*GXSetCurrentMtx)(u32);

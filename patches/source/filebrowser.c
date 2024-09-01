@@ -1,3 +1,4 @@
+#if 0
 #include <string.h>
 #include <limits.h>
 
@@ -31,7 +32,6 @@
 
 #define MAX_GCM_SIZE 0x57058000
 
-#if 0
 // default
 // favorites
 // alphabetical (optionally show letter?)

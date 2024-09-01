@@ -183,6 +183,8 @@ s32 usb_WriteUARTN(const void *buf, u32 len)
 
 #ifdef DEBUG
 
+#define PRINT_TIMESTAMPS
+
 u64 first_print = 0;
 void custom_OSReport(const char *fmt, ...) {
     if (first_print == 0) {
@@ -190,13 +192,18 @@ void custom_OSReport(const char *fmt, ...) {
     }
 
     va_list args;
-    // static char line[240];
+#ifdef PRINT_TIMESTAMPS
+    static char line[240];
+#endif
     static char buf[256];
 
     va_start(args, fmt);
+#ifndef PRINT_TIMESTAMPS
     int length = vsnprintf((char *)buf, sizeof(buf), (char *)fmt, args);
-    // int length = vsnprintf((char *)line, sizeof(line), (char *)fmt, args);
-    // length = sprintf(buf, "(%f): %s", (f32)diff_usec(first_print, gettime()) / 1000.0, line);
+#else
+    int length = vsnprintf((char *)line, sizeof(line), (char *)fmt, args);
+    length = sprintf(buf, "(%f): %s", (f32)diff_usec(first_print, gettime()) / 1000.0, line);
+#endif
 
     custom_WriteUARTN(buf, length);
 

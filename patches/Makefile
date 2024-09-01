@@ -48,6 +48,7 @@ LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_ntsc12_101.ld
 LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_pal10.ld
 LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_pal11.ld
 LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_pal12.ld
+LINKER_SCRIPTS	+= $(PROJDIR)/linker/combined.ld
 LDFLAGS		= $(MACHDEP) -Wl,-Map,$(notdir $@).map $(foreach script,$(LINKER_SCRIPTS),-T $(script)) -Wl,--gc-keep-exported -Wl,--nmagic -nolibc -nostdlib -nodefaultlibs
 
 #---------------------------------------------------------------------------------

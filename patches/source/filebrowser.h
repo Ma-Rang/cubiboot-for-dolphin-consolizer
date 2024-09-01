@@ -1,3 +1,4 @@
+#if 0
 #include <gctypes.h>
 
 #include "../../cubeboot/include/bnr.h"
@@ -42,3 +43,4 @@ void free_game_asset(int backing_index);
 game_asset_t *get_game_asset(int backing_index);
 
 const char *get_game_path(int backing_index);
+#endif

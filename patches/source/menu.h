@@ -25,5 +25,8 @@
 #define SOUND_CARD_MOVE 0x0b
 #define SOUND_CARD_ERROR 0x0d
 
+extern int selected_slot;
+extern int top_line_num;
+
 void custom_gameselect_init();
 void update_icon_positions();

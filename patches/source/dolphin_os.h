@@ -5,6 +5,8 @@
 
 #include "../../cubeboot/include/gcm.h"
 
+#define DEFAULT_THREAD_PRIO 0x10
+
 // gcbool
 typedef unsigned int BOOL;
 

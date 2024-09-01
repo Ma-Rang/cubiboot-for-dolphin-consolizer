@@ -2,7 +2,6 @@
 #include "reloc.h"
 #include "attr.h"
 
-__attribute_reloc__ BOOL (*OSRestoreInterrupts)(BOOL);
 __attribute_reloc__ OSThread* (*SelectThread)(BOOL);
 
 __attribute_reloc__ BOOL (*OSCreateThread)(void *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr);
