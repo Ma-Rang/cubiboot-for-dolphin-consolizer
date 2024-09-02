@@ -22,29 +22,29 @@ jobs:
           (cd libfat; sed -i '/rice/d' Makefile; make ogc-install)
       - name: Build cubeboot
         run: cd entry; make clean && make
-      - name: Build apploader
-        run: |
-          git clone -b force-early-boot --single-branch https://github.com/OffBroadway/gc-boot-tools.git
-          cd gc-boot-tools
-          (cd ppc/apploader; make)
-          (cd mkgbi; make)
-          ls mkgbi/gbi.hdr
-      - name: Build GCLoader
-        run: |
-          mkdir boot-dir && cp cubeboot/cubeboot.dol boot-dir
-          genisoimage -R -J -G gc-boot-tools/mkgbi/gbi.hdr -no-emul-boot -b cubeboot.dol -o boot.iso boot-dir
-      - name: Build PicoBoot
-        run: |
-          git clone https://github.com/webhdx/PicoBoot.git
-          cd PicoBoot; env PICO_SDK_FETCH_FROM_GIT=1 cmake .
-          ./process_ipl.py ../entry/entry.dol src/ipl.h
-          make
+      # - name: Build apploader
+      #   run: |
+      #     git clone -b force-early-boot --single-branch https://github.com/OffBroadway/gc-boot-tools.git
+      #     cd gc-boot-tools
+      #     (cd ppc/apploader; make)
+      #     (cd mkgbi; make)
+      #     ls mkgbi/gbi.hdr
+      # - name: Build GCLoader
+      #   run: |
+      #     mkdir boot-dir && cp cubeboot/cubeboot.dol boot-dir
+      #     genisoimage -R -J -G gc-boot-tools/mkgbi/gbi.hdr -no-emul-boot -b cubeboot.dol -o boot.iso boot-dir
+      # - name: Build PicoBoot
+      #   run: |
+      #     git clone https://github.com/webhdx/PicoBoot.git
+      #     cd PicoBoot; env PICO_SDK_FETCH_FROM_GIT=1 cmake .
+      #     ./process_ipl.py ../entry/entry.dol src/ipl.h
+      #     make
       - name: Rename Artifacts
         run: |
           mkdir -p dist/next
-          mv ./boot.iso dist/next/boot.iso
+          # mv ./boot.iso dist/next/boot.iso
           mv ./cubeboot/cubeboot.dol dist/next/cubeboot.dol
-          mv ./PicoBoot/picoboot.uf2 dist/next/cubeboot.uf2
+          # mv ./PicoBoot/picoboot.uf2 dist/next/cubeboot.uf2
       - name: Archive
         uses: actions/upload-artifact@v3
         with:
