@@ -47,6 +47,9 @@ int game_backing_count = 0;
 static OSMutex game_enum_mutex_obj;
 OSMutex *game_enum_mutex = &game_enum_mutex_obj;
 
+char game_enum_path[128] = {0};
+bool game_enum_running = false;
+
 // TODO: use a log2 malloc copy strategy for this
 __attribute_data_lowmem__ static gm_path_entry_t __gm_early_path_list[2000];
 __attribute_data_lowmem__ static gm_path_entry_t *__gm_sorted_path_list[2000];
@@ -462,7 +465,7 @@ gm_list_info gm_list_files(const char *target_dir) {
     OSReport("Listing files in %s\n", target_dir);
     u64 start_time = gettime();
 
-    int res = dvd_custom_open("/", FILE_ENTRY_TYPE_DIR, 0);
+    int res = dvd_custom_open(target_dir, FILE_ENTRY_TYPE_DIR, 0);
     if (res != 0) {
         OSReport("PANIC: SD Card could not be opened\n");
         while(1);
@@ -489,7 +492,7 @@ gm_list_info gm_list_files(const char *target_dir) {
         if (ret != 0) ipl_panic();
 
         if (ent.name[0] == 0) break; // end of directory
-        if (ent.type == FILE_ENTRY_TYPE_DIR) continue; // TODO: add DIR listing
+        // if (ent.type == FILE_ENTRY_TYPE_DIR) continue; // TODO: add DIR listing
 
         // only check file ext for now
         gm_file_type_t file_type = GM_FILE_TYPE_UNKNOWN;
@@ -509,6 +512,10 @@ gm_list_info gm_list_files(const char *target_dir) {
         // combine the path
         strcpy(file_full_path_buf, target_dir);
         strcat(file_full_path_buf, ent.name);
+#ifdef PRINT_READDIR_NAMES
+        // logging
+        OSReport("PATH ent(%u): %s\n", ent.type, file_full_path_buf);
+#endif
 
         // store the path
         gm_path_entry_t *entry = &__gm_early_path_list[path_entry_count];
@@ -525,8 +532,11 @@ gm_list_info gm_list_files(const char *target_dir) {
         }
     }
 
+    dvd_custom_close(dir_fd);
+
     f32 runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;
     OSReport("File enum completed! took=%f (%d)\n", runtime, game_backing_count);
+    (void)runtime;
 
     return (gm_list_info){path_entry_count};
 }
@@ -650,6 +660,11 @@ void gm_check_files(int path_count) {
             force_unload = true;
         }
 
+        if (!OSTryLockMutex(game_enum_mutex)) {
+            OSReport("STOPPING GAME LOADING\n");
+            break;
+        }
+
         // Load assets and store them in the auxiliarly data RAM using DMA
         if (entry->type == GM_FILE_TYPE_GAME) {
             // OSReport("DEBUG: Game Check %d\n", i);
@@ -701,13 +716,16 @@ void gm_check_files(int path_count) {
             // get the basename
             char *base = strrchr(entry->path, '/');
             strcpy(backing->desc.fullGameName, base + 1);
-            strcpy(backing->desc.description, "Homebrew Program");
+            if (entry->type == GM_FILE_TYPE_PROGRAM) {
+                strcpy(backing->desc.description, "Homebrew Program");
+            } else {
+                strcpy(backing->desc.description, "Directory");
+            }
 
             // load the icon
             bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
             if (!icon_loaded) {
                 // OSReport("Failed to load icon %s\n", entry->path);
-                continue;
             }
             backing->asset.use_banner = false;
             aram_offset += ICON_PIXELDATA_LEN;
@@ -718,6 +736,7 @@ void gm_check_files(int path_count) {
         }
 
         game_backing_count = gm_entry_count;
+        OSUnlockMutex(game_enum_mutex);
     }
 
     OSReport("Total entries = %d\n", gm_entry_count);
@@ -818,6 +837,7 @@ bool gm_can_move() {
     return true;
 }
 
+#if 0
 void gm_debug_func() {
     int icon_buf_count = gm_count_icon_buf();
     int banner_buf_count = gm_count_banner_buf();
@@ -835,6 +855,7 @@ void gm_debug_func() {
         }
     }
 }
+#endif
 
 void gm_setup_grid(int line_count, bool initial) {
     number_of_lines = (line_count + 7) >> 3;
@@ -849,28 +870,96 @@ void gm_setup_grid(int line_count, bool initial) {
 }
 
 void *gm_thread_worker(void* param) {
-    const char *target = param;
+    const char *target = &game_enum_path[0];
+    if (target == NULL || strlen(target) == 0) {
+        OSReport("ERROR: target is NULL\n");
+        return NULL;
+    }
+
     gm_list_info list_info = gm_list_files(target);
     gm_setup_grid(list_info.num_paths, true);
     gm_sort_files(list_info.num_paths);
     gm_check_files(list_info.num_paths);
     gm_setup_grid(gm_entry_count, false);
 
+    game_enum_running = false;
+    DCBlockStore((void*)OSRoundDown32B((u32)&game_enum_running));
+
     // pmalloc_dump_stats(pm);
     return NULL;
+}
+
+void gm_init_thread() {
+    OSInitMutex(game_enum_mutex);
 }
 
 // match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
 static u8 thread_obj[0x310];
 static u8 thread_stack[32 * 1024];
 void gm_start_thread(const char *target) {
+    if (game_enum_running) {
+        OSReport("ERROR: game enum thread is already running\n");
+        return;
+    }
+
+    // pop one path element
+    if (strcmp(target, "..") == 0) {
+        OSReport("Previous path...\n");
+        // zero the last char
+        game_enum_path[strlen(game_enum_path) - 1] = 0;
+
+        // find the last slash
+        char *last_slash = strrchr(game_enum_path, '/');
+        if (last_slash != NULL) {
+            *last_slash++ = 0;
+        }
+
+        if (strlen(game_enum_path) == 0) {
+            OSReport("ERROR: cannot go back any further\n");
+            game_enum_path[0] = '/';
+            game_enum_path[1] = 0;
+        }
+
+        target = game_enum_path;
+    }
+
+    char path[128];
+    strcpy(path, target);
+    if (path[strlen(path) - 1] != '/') {
+        strcat(path, "/");
+    }
+
+    OSReport("Starting game thread %s\n", path);
+    strcpy(game_enum_path, path);
+
+    game_enum_running = true;
+    DCBlockStore((void*)OSRoundDown32B((u32)&game_enum_running));
+
+    if (gm_entry_count > 0) {
+        for (int i = 0; i < gm_entry_count; i++) {
+            gm_file_entry_t *entry = gm_entry_backing[i];
+            if (entry->type == GM_FILE_TYPE_GAME) {
+                gm_icon_free(&entry->asset.icon);
+                gm_banner_free(&entry->asset.banner);
+            } else {
+                gm_icon_free(&entry->asset.icon);
+            }
+            gm_free(entry);
+        }
+        gm_entry_count = 0;
+    }
+
+    number_of_lines = 0;
+    DCBlockStore((void*)OSRoundDown32B((u32)&number_of_lines));
+
+    game_backing_count = 0;
+    DCBlockStore((void*)OSRoundDown32B((u32)&game_backing_count));
+
     // Start the thread
     u32 thread_stack_size = sizeof(thread_stack);
     void *thread_stack_top = thread_stack + thread_stack_size;
     s32 thread_priority = DEFAULT_THREAD_PRIO + 3;
 
-    OSInitMutex(game_enum_mutex);
-
-    dolphin_OSCreateThread(&thread_obj[0], gm_thread_worker, (void*)target, thread_stack_top, thread_stack_size, thread_priority, 0);
+    dolphin_OSCreateThread(&thread_obj[0], gm_thread_worker, NULL, thread_stack_top, thread_stack_size, thread_priority, 0);
     dolphin_OSResumeThread(&thread_obj[0]);
 }

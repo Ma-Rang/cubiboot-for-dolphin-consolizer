@@ -15,10 +15,12 @@
 
 #include "dolphin_dvd.h"
 
+#include "dir_tex_bin.h"
 #include "dol_tex_bin.h"
 #include "font.h"
 #include "boot.h"
 #include "ipl.h"
+#include "os.h"
 
 // TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
 #include "../build/default_opening_bin.h"
@@ -168,7 +170,7 @@ __attribute_data__ GXColorS10 *menu_color_empty_sel;
 
 __attribute_data__ model global_textured_icon = {};
 __attribute_data__ model global_empty_icon = {};
-__attribute_data__ BNR global_start_banner = {};
+// __attribute_data__ BNR global_start_banner = {};
 
 // pointers
 model *textured_icon = &global_textured_icon;
@@ -199,19 +201,13 @@ __attribute_used__ void custom_gameselect_init() {
     *banner_pointer = (u32)&default_opening_bin[0];
     *banner_ready = 1;
 
-    // start banner
-    global_start_banner.magic[0] = 'B';
-    global_start_banner.magic[1] = 'N';
-    global_start_banner.magic[2] = 'R';
-    global_start_banner.magic[3] = '1';    
-
     // menu setup
     menu_blob = *ptr_menu_blob;
     game_blob_a = *ptr_game_blob_a;
     game_blob_b = *ptr_game_blob_b;
 
     // colors
-    u32 color_num = SAVE_COLOR_GREEN;
+    u32 color_num = SAVE_COLOR_PURPLE; // TODO: make a setting for this
     u32 color_index = 1 << (10 + 3 + color_num);
     menu_color_icon = get_save_color(color_index, SAVE_ICON);
     menu_color_icon_sel = get_save_color(color_index, SAVE_ICON_SEL);
@@ -294,11 +290,11 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
 
     gm_file_entry_t *entry = gm_get_game_entry(slot_num);
     if (entry != NULL) {
-        if (entry->asset.use_banner && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
+        if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
+            has_texture = true;
+        } else if (entry->asset.use_banner && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
             has_texture = true;
         } else if (entry->asset.icon.state == GM_LOAD_STATE_LOADED) {
-            has_texture = true;
-        } else if (entry->type == GM_FILE_TYPE_PROGRAM) {
             has_texture = true;
         }
     }
@@ -334,10 +330,11 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
 
         // icon
         tex_data *icon_tex = &m->data->tex->dat[1];
-        if (entry->type == GM_FILE_TYPE_PROGRAM) {
+        if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
             u32 target_texture_data = 0;
             if (entry->asset.icon.state == GM_LOAD_STATE_NONE) {
-                target_texture_data = (u32)&dol_tex_bin[0];
+                const uint8_t *default_icon = entry->type == GM_FILE_TYPE_DIRECTORY ? &dir_tex_bin[0] : &dol_tex_bin[0];
+                target_texture_data = (u32)default_icon;
             } else {
                 target_texture_data = (u32)entry->asset.icon.buf->data;
             }
@@ -575,16 +572,19 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
         draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, entry->desc.description, 0x1f);
 
         switch_lang_eng();
-        if (entry->type == GM_FILE_TYPE_PROGRAM) {
+        if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
             // game source
             switch_lang_eng();
             draw_blob_border(make_type('f','r','m','c'), menu_blob, &white);
-            draw_text("DOL", 20, 125, 540, &white);
 
+            char *type_text = entry->type == GM_FILE_TYPE_DIRECTORY ? "DIR" : "DOL";
+            draw_text(type_text, 20, 125, 540, &white);
+
+            const uint8_t *default_icon = entry->type == GM_FILE_TYPE_DIRECTORY ? &dir_tex_bin[0] : &dol_tex_bin[0];
             if (entry->asset.icon.state == GM_LOAD_STATE_NONE) {
                 // icon image
                 setup_tex_draw(1, 0, 1);
-                icon_texture.offset = (s32)((u32)&dol_tex_bin[0] - (u32)&icon_texture);
+                icon_texture.offset = (s32)((u32)default_icon - (u32)&icon_texture);
                 draw_blob_tex(make_type('i','c','0','0'), menu_blob, &white, &icon_texture);
             } else if (entry->asset.icon.state == GM_LOAD_STATE_LOADED) {
                 // icon image
@@ -737,35 +737,68 @@ __attribute_used__ s32 handle_gameselect_inputs() {
             current_gameselect_state = SUBMENU_GAMESELECT_LOADER;
             Jac_PlaySe(SOUND_SUBMENU_EXIT);
         } else if (!in_submenu_transition) {
-            anim_step = 0; // anim reset
-            *banner_pointer = (u32)&default_opening_bin[0]; // banner reset
-            Jac_PlaySe(SOUND_MENU_EXIT);
-            return MENU_GAMESELECT_ID;
+            // TODO: check current path depth
+            if (strcmp(game_enum_path, "/") != 0) {
+                if (game_enum_running) {
+                    // OSReport("Stopping file enum\n");
+                    OSLockMutex(game_enum_mutex);
+                    while (game_enum_running) {
+                        DCInvalidateRange((void*)OSRoundDown32B((u32)&game_enum_running), 4);
+                    }
+                    // OSReport("File enum done\n");
+                    OSUnlockMutex(game_enum_mutex);
+                }
+
+                Jac_PlaySe(SOUND_MENU_EXIT);
+                gm_start_thread("..");
+
+            } else {
+                anim_step = 0; // anim reset
+                *banner_pointer = (u32)&default_opening_bin[0]; // banner reset
+                Jac_PlaySe(SOUND_MENU_EXIT);
+                return MENU_GAMESELECT_ID;
+            }
         }
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_A && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
         if (selected_slot < game_backing_count && !in_submenu_transition) {
-            in_submenu_transition = true;
-            current_gameselect_state = SUBMENU_GAMESELECT_START;
             gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
-            if (entry != NULL) {
-                *banner_pointer = (u32)&global_start_banner; // banner buf
-                memcpy(&global_start_banner.desc[0], &entry->desc, sizeof(BNRDesc)); // copy desc
+            if (entry->type == GM_FILE_TYPE_DIRECTORY) {
+                // OSReport("Selected DIR slot: %d (%p)\n", selected_slot, entry);
+
+                if (game_enum_running) {
+                    // OSReport("Stopping file enum\n");
+                    OSLockMutex(game_enum_mutex);
+                    while (game_enum_running) {
+                        DCInvalidateRange((void*)OSRoundDown32B((u32)&game_enum_running), 4);
+                    }
+                    // OSReport("File enum done\n");
+                    OSUnlockMutex(game_enum_mutex);
+                }
+
+                Jac_PlaySe(SOUND_SUBMENU_ENTER);
+
+                char path[128];
+                sprintf(path, "%s/", entry->path);
+                gm_start_thread(path);
+            } else {
+                in_submenu_transition = true;
+                current_gameselect_state = SUBMENU_GAMESELECT_START;
+
+                Jac_PlaySe(SOUND_SUBMENU_ENTER);
+                setup_gameselect_anim();
+                setup_cube_anim();
+
+                // OSReport("Selected slot: %d (%p)\n", selected_slot, asset);
             }
-
-            Jac_PlaySe(SOUND_SUBMENU_ENTER);
-            setup_gameselect_anim();
-            setup_cube_anim();
-
-            // OSReport("Selected slot: %d (%p)\n", selected_slot, asset);
         }
     }
 
-    if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
-        extern void gm_debug_func();
-        gm_debug_func();
-    }
+    // if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
+    //     extern void gm_debug_func();
+    //     gm_debug_func();
+    // }
 
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();

@@ -82,8 +82,11 @@ typedef struct {
 extern int number_of_lines;
 extern int game_backing_count;
 extern OSMutex *game_enum_mutex;
+extern bool game_enum_running;
+extern char game_enum_path[];
 
 void gm_init_heap();
+void gm_init_thread();
 void gm_start_thread(const char *target);
 void gm_line_changed(int delta);
 bool gm_can_move();

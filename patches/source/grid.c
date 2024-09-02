@@ -15,9 +15,10 @@
 #define START_LINE 0
 #define ANIM_DIRECTION_UP 0
 #define ANIM_DIRECTION_DOWN 1
+#define MAX_LINES 240 // 240 lines * 8 slots = 1920 slots
 
 bool grid_setup_done = false;
-line_backing_t browser_lines[256]; // 256 lines * 8 slots = 2048 slots
+line_backing_t browser_lines[MAX_LINES]; 
 
 // ===============================================================================
 
@@ -39,6 +40,15 @@ void grid_setup_func() {
     OSReport("browser_lines = %p\n", browser_lines);
     OSReport("number_of_lines = %d\n", number_of_lines);
 
+    for (int line_num = 0; line_num < MAX_LINES; line_num++) {
+        line_backing_t *line_backing = &browser_lines[line_num];
+        line_backing->transparency = 0.0;
+
+        anim_list_t *anims = &line_backing->anims;
+        anims->pending_count = 0;
+        anims->remaining = 0;
+    }
+
     // initial
     selected_slot = START_LINE * 8;
     top_line_num = START_LINE;
@@ -55,9 +65,10 @@ void grid_setup_func() {
             line_backing->transparency = 0.0;
         }
 
-        anim_list_t *anims = &line_backing->anims;
-        anims->pending_count = 0;
-        anims->remaining = 0;
+        // anim_list_t *anims = &line_backing->anims;
+        // anims->pending_count = 0;
+        // anims->remaining = 0;
+
         // OSReport("Setting line position %d = %f\n", line_num, line_backing->raw_position_y);
     }
 

@@ -446,7 +446,7 @@ int dvd_custom_unlink_flash(char *path) {
     return 0;
 }
 
-int dvd_custom_open(char *path, uint8_t type, uint8_t flags) {
+int dvd_custom_open(const char *path, uint8_t type, uint8_t flags) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);
@@ -477,7 +477,7 @@ int dvd_custom_open(char *path, uint8_t type, uint8_t flags) {
     return 0;
 }
 
-int dvd_custom_open_flash(char *path, uint8_t type, uint8_t flags) {
+int dvd_custom_open_flash(const char *path, uint8_t type, uint8_t flags) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);

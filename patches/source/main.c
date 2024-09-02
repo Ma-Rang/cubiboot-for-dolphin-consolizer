@@ -16,9 +16,8 @@
 
 #include "dolphin_arq.h"
 #include "flippy_sync.h"
-#include "filebrowser.h"
-#include "games.h"
 #include "gc_dvd.h"
+#include "games.h"
 
 #include "video.h"
 #include "dol.h"
@@ -261,6 +260,7 @@ __attribute_used__ void pre_thread_init() {
     orig_thread_init();
     if (!start_passthrough_game) {
         gm_init_heap();
+        gm_init_thread();
         gm_start_thread("/");
     }
 }
@@ -449,16 +449,12 @@ __attribute_used__ void bs2start() {
         chainload_boot_game(NULL, true);
     }
 
-#if 0
     // TODO: use the filebrowser to get the game path
     // only load the apploader if the boot path is not a .dol file
-    extern int strncmpci(const char * str1, const char * str2, size_t num);
-    bool boot_dol_file = strncmpci(boot_path + strlen(boot_path) - 4, ".dol", 4) == 0 || strncmpci(boot_path + strlen(boot_path) - 8, ".dol+cli", 8) == 0;
-#else
-    bool boot_dol_file = false;
-#endif
+    gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+    OSReport("Entry %s [type=%d]\n", entry->path, entry->type);
 
-    if (boot_dol_file) {
+    if (entry->type == GM_FILE_TYPE_PROGRAM) {
         custom_OSReport("Booting DOL\n");
         load_stub();
 

@@ -2,16 +2,17 @@
 #include "asm.h"
 #include "patch_asm.h"
 
-// patch_inst vNTSC_11(_change_background_color) 0x81481cc8 .4byte 0xFFFF00FF
+// patch_inst vNTSC_11(_change_background_color) 0x81481cc8 .4byte 0x000435FF
 // patch_inst vNTSC_11(_test_only_a) 0x8130bcfc li r0, 2
 // patch_inst vNTSC_11(_test_only_b) 0x81301448 bl before_audio_init
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
 // patch_inst vNTSC_11(_skip_menu_logo_a) 0x8130bcb4 li r3, 1
 // patch_inst vNTSC_11(_skip_menu_logo_b) 0x8130bcc0 li r0, 5
-patch_inst vNTSC_11(_skip_menu_logo_c) 0x8130d178 li r3, 4 // force menu fast
 
-patch_inst vNTSC_11(_force_anim_draw) 0x8130d588 nop
-patch_inst vNTSC_11(_patch_anim_draw) 0x8130d590 bl patch_anim_draw
+// Trevor's greatest hits
+// patch_inst vNTSC_11(_skip_menu_logo_c) 0x8130d178 li r3, 4 // force menu fast
+// patch_inst vNTSC_11(_force_anim_draw) 0x8130d588 nop
+// patch_inst vNTSC_11(_patch_anim_draw) 0x8130d590 bl patch_anim_draw
 
 patch_inst vNTSC_10(_reduce_aram_alloc) 0x81301204 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
 patch_inst vNTSC_11(_reduce_aram_alloc) 0x81301040 lis r5, 0x10 // Reduce ARAM to 1MB for JAudio (also used in Pikmin)
