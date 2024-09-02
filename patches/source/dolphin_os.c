@@ -4,8 +4,8 @@
 
 __attribute_reloc__ OSThread* (*SelectThread)(BOOL);
 
-__attribute_reloc__ BOOL (*OSCreateThread)(void *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr);
-__attribute_reloc__ s32 (*OSResumeThread)(void *thread);
+__attribute_reloc__ BOOL (*OSCreateThread)(OSThread *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr);
+__attribute_reloc__ s32 (*OSResumeThread)(OSThread *thread);
 
 __attribute_reloc__ OSThread* (*SetEffectivePriority)(OSThread* thread, s32 priority);
 __attribute_reloc__ s32 (*__OSGetEffectivePriority)(OSThread* thread);
@@ -13,7 +13,8 @@ __attribute_reloc__ s32 (*__OSGetEffectivePriority)(OSThread* thread);
 __attribute_reloc__ void (*OSSleepThread)(OSThreadQueue* queue);
 __attribute_reloc__ void (*OSWakeupThread)(OSThreadQueue* queue);
 
-OSThread* OS_CURRENT_THREAD;
+OSThread* __OSCurrentThread;
+OSThreadQueue __OSActiveThreadQueue;
 
 // from https://github.com/projectPiki/pikmin2/blob/de4b757bcb49e10b6d6822e6198be93c01890dcf/src/Dolphin/os/OSThread.c#L336-L343
 void OSYieldThread() {
@@ -22,16 +23,21 @@ void OSYieldThread() {
     OSRestoreInterrupts(enabled);
 }
 
-BOOL dolphin_OSCreateThread(void *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr) {
+BOOL dolphin_OSCreateThread(OSThread *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr) {
     return OSCreateThread(thread, func, param, stack, stackSize, priority, attr);
 }
-s32 dolphin_OSResumeThread(void *thread) {
+
+s32 dolphin_OSResumeThread(OSThread *thread) {
     return OSResumeThread(thread);
+}
+
+void dolphin_OSWakeupThread(OSThreadQueue* queue) {
+    OSWakeupThread(queue);   
 }
 
 // from https://github.com/zeldaret/tp/blob/a61e3491f7c46b698514af50464cf71ba76bd3a3/libs/dolphin/os/OSThread.c#L196
 OSThread* OSGetCurrentThread(void) {
-    return OS_CURRENT_THREAD;
+    return __OSCurrentThread;
 }
 
 void OSInitThreadQueue(OSThreadQueue* queue) {
@@ -39,9 +45,59 @@ void OSInitThreadQueue(OSThreadQueue* queue) {
     queue->head = NULL;
 }
 
-// NTSC11
-// s32 (*OSDisableScheduler)(void) = (void*)0x8135f2c0;
-// s32 (*OSEnableScheduler)(void) = (void*)0x8135f300;
+#define RemoveItem(queue, thread, link)                                                            \
+    do {                                                                                           \
+        OSThread *next, *prev;                                                                     \
+        next = (thread)->link.next;                                                                \
+        prev = (thread)->link.prev;                                                                \
+        if (next == NULL)                                                                          \
+            (queue)->tail = prev;                                                                  \
+        else                                                                                       \
+            next->link.prev = prev;                                                                \
+        if (prev == NULL)                                                                          \
+            (queue)->head = next;                                                                  \
+        else                                                                                       \
+            prev->link.next = next;                                                                \
+    } while (0)
+
+static BOOL __OSIsThreadActive(OSThread* thread) {
+    OSThread* active;
+
+    if (thread->state == 0) {
+        return FALSE;
+    }
+
+    for (active = __OSActiveThreadQueue.head; active; active = active->active_threads_link.next) {
+        if (thread == active) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+BOOL OSJoinThread(OSThread *thread, void *val) {
+    int enabled = OSDisableInterrupts();
+
+    if (!(thread->attributes & 1) && (thread->state != 8) && (thread->join_queue.head == NULL)) {
+        OSSleepThread(&thread->join_queue);
+        if (__OSIsThreadActive(thread) == 0) {
+            OSRestoreInterrupts(enabled);
+            return 0;
+        }
+    }
+    if (thread->state == 8) {
+        if (val) {
+            *(s32*)val = (s32)thread->exit_value;
+        }
+        RemoveItem(&__OSActiveThreadQueue, thread, active_threads_link);
+        thread->state = 0;
+        OSRestoreInterrupts(enabled);
+        return 1;
+    }
+    OSRestoreInterrupts(enabled);
+    return 0;
+}
 
 void __OSPromoteThread(OSThread* thread, s32 priority) {
     do {

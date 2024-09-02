@@ -160,9 +160,14 @@ struct dolphin_lowmem {
 	uint32_t		b_cpu_clock_speed;
 } __attribute__ ((__packed__));
 
+extern OSThread* __OSCurrentThread;
+extern OSThreadQueue __OSActiveThreadQueue;
+
 void OSYieldThread();
-BOOL dolphin_OSCreateThread(void *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr);
-s32 dolphin_OSResumeThread(void *thread);
+BOOL OSJoinThread(OSThread *thread, void * val);
+void __OSPromoteThread(OSThread *thread, s32 priority);
+BOOL dolphin_OSCreateThread(OSThread *thread, OSThreadStartFunction func, void* param, void* stack, u32 stackSize, s32 priority, u16 attr);
+s32 dolphin_OSResumeThread(OSThread *thread);
 
 void OSInitMutex(OSMutex* mutex);
 void OSLockMutex(OSMutex* mutex);

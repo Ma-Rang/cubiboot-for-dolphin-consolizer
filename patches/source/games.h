@@ -87,6 +87,7 @@ extern char game_enum_path[];
 
 void gm_init_heap();
 void gm_init_thread();
+void gm_deinit_thread();
 void gm_start_thread(const char *target);
 void gm_line_changed(int delta);
 bool gm_can_move();

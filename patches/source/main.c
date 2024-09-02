@@ -77,8 +77,8 @@ __attribute_data__ static GXColorS10 color_bg_inner;
 __attribute_data__ static GXColorS10 color_bg_outer_0;
 __attribute_data__ static GXColorS10 color_bg_outer_1;
 
-// for filebrowser
-// __attribute_data__ u32 stop_loading_games = 0;
+// start
+__attribute_data__ gm_file_entry_t boot_entry;
 
 __attribute_used__ void mod_cube_colors() {
     if (cube_color == 0) {
@@ -378,33 +378,14 @@ __attribute_used__ u32 bs2tick() {
     return STATE_NO_DISC;
 }
 
-extern char boot_path[];
-
 __attribute_used__ void bs2start() {
     OSReport("DONE\n");
-
     if (!start_passthrough_game) {
-        OSReport("Waiting for file enum\n");
-        OSLockMutex(game_enum_mutex);
-        OSYieldThread();
-        udelay(100 * 1000); // probably overkill??
-        OSYieldThread();
+         gm_deinit_thread();
     }
 
     // memcpy(global_state, &local_state, sizeof(cubeboot_state));
     // global_state->boot_code = 0xCAFEBEEF;
-
-    // if (prog_entrypoint == 0) {
-    //     OSReport("HALT: No program\n");
-    //     while(1); // block forever
-    // }
-
-    // // TODO: remove this after testing on hardware
-    OSReport("we are about to look at %08x\n", (u32)boot_path);
-    // udelay(100 * 1000);
-
-    OSReport("we are about to open %s\n", boot_path);
-    // udelay(100 * 1000);
 
     // no IPL code should be running after this point
 
@@ -449,12 +430,8 @@ __attribute_used__ void bs2start() {
         chainload_boot_game(NULL, true);
     }
 
-    // TODO: use the filebrowser to get the game path
-    // only load the apploader if the boot path is not a .dol file
-    gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
-    OSReport("Entry %s [type=%d]\n", entry->path, entry->type);
-
-    if (entry->type == GM_FILE_TYPE_PROGRAM) {
+    char *boot_path = boot_entry.path;
+    if (boot_entry.type == GM_FILE_TYPE_PROGRAM) {
         custom_OSReport("Booting DOL\n");
         load_stub();
 

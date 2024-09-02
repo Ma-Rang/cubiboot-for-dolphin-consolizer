@@ -22,6 +22,8 @@
 #include "ipl.h"
 #include "os.h"
 
+#include "time.h"
+
 // TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
 #include "../build/default_opening_bin.h"
 #include "../../cubeboot/include/gcm.h"
@@ -86,8 +88,6 @@ __attribute_reloc__ void (*apply_save_rot)(s32 x, s32 y, s32 z, Mtx matrix);
 __attribute_reloc__ u32 *bs2start_ready;
 __attribute_reloc__ u32 *banner_pointer;
 __attribute_reloc__ u32 *banner_ready;
-
-__attribute_data__ char boot_path[128];
 
 typedef struct {
     f32 scale;
@@ -431,6 +431,7 @@ __attribute_used__ void draw_info_box(u16 width, u16 height, u16 center_x, u16 c
     return;
 }
 
+#if 0
 void patch_anim_draw() {
     prep_text_mode();
 
@@ -438,6 +439,7 @@ void patch_anim_draw() {
     GXColor bottom_color = {0x80, 0x00, 0x57, 0xb4};
     draw_info_box(0x1200, 0x560, 0x1230, 0xb20, 0xff, &top_color, &bottom_color);
 }
+#endif
 
 // #define WITH_SPACE 1
 
@@ -739,16 +741,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         } else if (!in_submenu_transition) {
             // TODO: check current path depth
             if (strcmp(game_enum_path, "/") != 0) {
-                if (game_enum_running) {
-                    // OSReport("Stopping file enum\n");
-                    OSLockMutex(game_enum_mutex);
-                    while (game_enum_running) {
-                        DCInvalidateRange((void*)OSRoundDown32B((u32)&game_enum_running), 4);
-                    }
-                    // OSReport("File enum done\n");
-                    OSUnlockMutex(game_enum_mutex);
-                }
-
+                gm_deinit_thread();
                 Jac_PlaySe(SOUND_MENU_EXIT);
                 gm_start_thread("..");
 
@@ -765,18 +758,9 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         if (selected_slot < game_backing_count && !in_submenu_transition) {
             gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
             if (entry->type == GM_FILE_TYPE_DIRECTORY) {
-                // OSReport("Selected DIR slot: %d (%p)\n", selected_slot, entry);
+                OSReport("Selected DIR slot: %d (%p)\n", selected_slot, entry);
 
-                if (game_enum_running) {
-                    // OSReport("Stopping file enum\n");
-                    OSLockMutex(game_enum_mutex);
-                    while (game_enum_running) {
-                        DCInvalidateRange((void*)OSRoundDown32B((u32)&game_enum_running), 4);
-                    }
-                    // OSReport("File enum done\n");
-                    OSUnlockMutex(game_enum_mutex);
-                }
-
+                gm_deinit_thread();
                 Jac_PlaySe(SOUND_SUBMENU_ENTER);
 
                 char path[128];
@@ -795,16 +779,18 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         }
     }
 
-    // if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
-    //     extern void gm_debug_func();
-    //     gm_debug_func();
-    // }
+    if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
+        extern void gm_debug_func();
+        gm_debug_func();
+    }
 
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();
         Jac_PlaySe(SOUND_MENU_FINAL);
         gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
-        strcpy(boot_path, entry->path);
+
+        extern gm_file_entry_t boot_entry;
+        memcpy(&boot_entry, entry, sizeof(gm_file_entry_t));
         *bs2start_ready = 1;
     }
 

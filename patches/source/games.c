@@ -664,6 +664,7 @@ void gm_check_files(int path_count) {
             OSReport("STOPPING GAME LOADING\n");
             break;
         }
+        OSUnlockMutex(game_enum_mutex);
 
         // Load assets and store them in the auxiliarly data RAM using DMA
         if (entry->type == GM_FILE_TYPE_GAME) {
@@ -735,8 +736,8 @@ void gm_check_files(int path_count) {
             gm_entry_count++;
         }
 
+        udelay_threaded(100 * 1000); // test only
         game_backing_count = gm_entry_count;
-        OSUnlockMutex(game_enum_mutex);
     }
 
     OSReport("Total entries = %d\n", gm_entry_count);
@@ -883,7 +884,8 @@ void *gm_thread_worker(void* param) {
     gm_setup_grid(gm_entry_count, false);
 
     game_enum_running = false;
-    DCBlockStore((void*)OSRoundDown32B((u32)&game_enum_running));
+    // DCBlockStore((void*)OSRoundDown32B((u32)&game_enum_running));
+    DCFlushRange((void*)OSRoundDown32B((u32)&game_enum_running), 4);
 
     // pmalloc_dump_stats(pm);
     return NULL;
@@ -894,7 +896,7 @@ void gm_init_thread() {
 }
 
 // match https://github.com/projectPiki/pikmin2/blob/snakecrowstate-work/include/Dolphin/OS/OSThread.h#L55-L74
-static u8 thread_obj[0x310];
+static OSThread thread_obj;
 static u8 thread_stack[32 * 1024];
 void gm_start_thread(const char *target) {
     if (game_enum_running) {
@@ -934,6 +936,8 @@ void gm_start_thread(const char *target) {
 
     game_enum_running = true;
     DCBlockStore((void*)OSRoundDown32B((u32)&game_enum_running));
+    
+    // OSUnlockMutex(game_enum_mutex);
 
     if (gm_entry_count > 0) {
         for (int i = 0; i < gm_entry_count; i++) {
@@ -960,6 +964,22 @@ void gm_start_thread(const char *target) {
     void *thread_stack_top = thread_stack + thread_stack_size;
     s32 thread_priority = DEFAULT_THREAD_PRIO + 3;
 
-    dolphin_OSCreateThread(&thread_obj[0], gm_thread_worker, NULL, thread_stack_top, thread_stack_size, thread_priority, 0);
-    dolphin_OSResumeThread(&thread_obj[0]);
+    dolphin_OSCreateThread(&thread_obj, gm_thread_worker, NULL, thread_stack_top, thread_stack_size, thread_priority, 0);
+    dolphin_OSResumeThread(&thread_obj);
+}
+
+
+void gm_deinit_thread() {
+    if (game_enum_running) {
+        OSReport("Stopping file enum\n");
+        OSLockMutex(game_enum_mutex);
+        OSReport("Waiting for thread to exit, %d\n", game_enum_running);
+        OSJoinThread(&thread_obj, NULL);
+        OSReport("File enum done\n");
+        OSUnlockMutex(game_enum_mutex);
+    }
+}
+
+void gm_debug_func() {
+    
 }

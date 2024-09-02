@@ -17,7 +17,8 @@ EXI = 0xCC006800;
 DSP = 0xCC005000;
 
 /* used by OS */
-OS_CURRENT_THREAD = 0x800000E4;
+__OSCurrentThread = 0x800000E4;
+__OSActiveThreadQueue = 0x800000DC;
 
 SECTIONS {
     . = 0x80100000;

@@ -50,3 +50,4 @@ u32 diff_usec(u64 start,u64 end);
 u32 diff_nsec(u64 start,u64 end);
 
 void udelay(unsigned us);
+void udelay_threaded(unsigned us);

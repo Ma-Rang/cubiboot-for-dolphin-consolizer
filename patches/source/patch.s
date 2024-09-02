@@ -10,7 +10,7 @@
 // patch_inst vNTSC_11(_skip_menu_logo_b) 0x8130bcc0 li r0, 5
 
 // Trevor's greatest hits
-// patch_inst vNTSC_11(_skip_menu_logo_c) 0x8130d178 li r3, 4 // force menu fast
+patch_inst vNTSC_11(_skip_menu_logo_c) 0x8130d178 li r3, 4 // force menu fast
 // patch_inst vNTSC_11(_force_anim_draw) 0x8130d588 nop
 // patch_inst vNTSC_11(_patch_anim_draw) 0x8130d590 bl patch_anim_draw
 
