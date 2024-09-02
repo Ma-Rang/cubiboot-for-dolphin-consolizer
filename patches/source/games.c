@@ -113,6 +113,17 @@ static int gm_count_banner_buf() {
     return count;
 }
 
+static int gm_count_pending_free() {
+    int count = 0;
+    for (int i = 0; i < gm_entry_count; i++) {
+        gm_file_entry_t *entry = gm_entry_backing[i];
+        count += entry->asset.icon.schedule_free;
+        count += entry->asset.banner.schedule_free;
+    }
+
+    return count;
+}
+
 // TODO: swap the icon/banner callback with req->owner checks
 static void arq_icon_callback_setup(u32 arq_request_ptr) {
     // OSReport("CALLBACK arq_icon_callback_setup\n");
@@ -204,6 +215,12 @@ void gm_icon_setup_unload(gm_icon_t *icon, u32 aram_offset) {
 
 void gm_icon_load(gm_icon_t *icon) {
     // OSReport("Loading icon %d\n", icon->state);
+    if (icon->state == GM_LOAD_STATE_SETUP) {
+        OSReport("ERROR: banner is still in setup\n");
+    }
+    if (icon->state == GM_LOAD_STATE_UNLOADING) {
+        OSReport("ERROR: banner is still in unload\n");
+    }
     if (icon->state == GM_LOAD_STATE_NONE || icon->state == GM_LOAD_STATE_LOADED) return;
     icon->state = GM_LOAD_STATE_LOADING;
 
@@ -229,7 +246,8 @@ void gm_icon_load(gm_icon_t *icon) {
 void gm_icon_free(gm_icon_t *icon) {
     if (icon->state == GM_LOAD_STATE_NONE) return;
     
-    if (icon->state == GM_LOAD_STATE_LOADING) {
+    if (icon->state == GM_LOAD_STATE_LOADING || icon->state == GM_LOAD_STATE_SETUP) {
+        OSReport("ERROR: icon is still loading\n");
         icon->schedule_free = true;
         return;
     }
@@ -274,6 +292,12 @@ void gm_banner_setup_unload(gm_banner_t *banner, u32 aram_offset) {
 
 void gm_banner_load(gm_banner_t *banner) {
     // OSReport("Loading banner %d\n", banner->state);
+    if (banner->state == GM_LOAD_STATE_SETUP) {
+        OSReport("ERROR: banner is still in setup\n");
+    }
+    if (banner->state == GM_LOAD_STATE_UNLOADING) {
+        OSReport("ERROR: banner is still in unload\n");
+    }
     if (banner->state == GM_LOAD_STATE_NONE || banner->state == GM_LOAD_STATE_LOADED) return;
     banner->state = GM_LOAD_STATE_LOADING;
 
@@ -297,9 +321,13 @@ void gm_banner_load(gm_banner_t *banner) {
 }
 
 void gm_banner_free(gm_banner_t *banner) {
-    if (banner->state == GM_LOAD_STATE_NONE || banner->state == GM_LOAD_STATE_UNLOADING) return;
+    if (banner->state == GM_LOAD_STATE_NONE || banner->state == GM_LOAD_STATE_UNLOADING) {
+        if (banner->state == GM_LOAD_STATE_UNLOADING) OSReport("ERROR: banner is unloading??\n");
+        return;
+    }
     
-    if (banner->state == GM_LOAD_STATE_LOADING) {
+    if (banner->state == GM_LOAD_STATE_LOADING || banner->state == GM_LOAD_STATE_SETUP) {
+        OSReport("ERROR: banner is still loading\n");
         banner->schedule_free = true;
         return;
     }
@@ -512,64 +540,6 @@ void gm_sort_files(int path_count) {
     OSReport("Sort took=%f\n", runtime);
     (void)runtime;
 }
-
-void gm_check_headers(int path_count) {
-    // Here we will also check for override assets and matching save icons
-
-    // Enumerate all of the games
-    u64 start_time = gettime();
-    for (int i = 0; i < path_count; i++) {
-        gm_path_entry_t *entry = __gm_sorted_path_list[i];
-        // OSReport("Checking header %s [%d]\n", entry->path, entry->type);
-
-        if (entry->type == GM_FILE_TYPE_GAME) {
-            OSReport("Game Check %d\n", i);
-            // check if the banner file exists
-            dolphin_game_into_t info = get_game_info(entry->path);
-            if (!info.valid) continue;
-            OSReport("Found game %s\n", entry->path); // lets do this!
-
-            // create a new entry
-            gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
-            memset(backing, 0, sizeof(gm_file_entry_t));
-            memcpy(backing->path, entry->path, sizeof(backing->path));
-            backing->type = GM_FILE_TYPE_GAME;
-
-            // copy the extra info
-            memcpy(backing->extra.game_id, info.game_id, sizeof(backing->extra.game_id));
-            backing->extra.dvd_bnr_offset = info.bnr_offset;
-            backing->extra.dvd_bnr_type = info.bnr_type;
-
-            // set heap pointer
-            gm_entry_backing[gm_entry_count] = backing;
-            gm_entry_count++;
-        } else if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
-            OSReport("Found other %s\n", entry->path); // lets do this!
-
-            // create a new entry
-            gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
-            memset(backing, 0, sizeof(gm_file_entry_t));
-            memcpy(backing->path, entry->path, sizeof(backing->path));
-            backing->type = entry->type;
-
-            // get the basename
-            char *base = strrchr(entry->path, '/');
-            strcpy(backing->desc.fullGameName, base + 1);
-            strcpy(backing->desc.description, "Homebrew Program");
-
-            // set heap pointer
-            gm_entry_backing[gm_entry_count] = backing;
-            gm_entry_count++;
-        }
-    }
-
-    OSReport("Total entries = %d\n", gm_entry_count);
-
-    f32 runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;
-    OSReport("Header check took=%f\n", runtime);
-    (void)runtime;
-}
-
 // returns amount of space used in aram
 static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
     if (entry->extra.dvd_bnr_offset == 0) return false;
@@ -665,51 +635,97 @@ static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unl
     return true;
 }
 
-void gm_load_assets() {
+void gm_check_files(int path_count) {
+    // Here we will also check for override assets and matching save icons
     u32 aram_offset = (1 * 1024 * 1024); // 1MB mark
 
-    // TODO: do a dynamic check for the amount of space used in ARAM
-    for (int i = 0; i < gm_entry_count; i++) {
-        gm_file_entry_t *entry = gm_entry_backing[i];
-        OSReport("[%d] Loading assets %s (%d)\n", i, entry->path, entry->type);
+    // Enumerate all of the games
+    u64 start_time = gettime();
+    for (int i = 0; i < path_count; i++) {
+        gm_path_entry_t *entry = __gm_sorted_path_list[i];
+        // OSReport("Checking header %s [%d]\n", entry->path, entry->type);
 
         bool force_unload = false;
-        if (i >= ASSETS_INITIAL_COUNT) {
+        if (gm_entry_count - (top_line_num * ASSETS_PER_LINE) > ASSETS_INITIAL_COUNT) {
             force_unload = true;
         }
 
-        // Load assets for each approved path and store them in the auxiliarly data RAM using DMA
+        // Load assets and store them in the auxiliarly data RAM using DMA
         if (entry->type == GM_FILE_TYPE_GAME) {
+            // OSReport("DEBUG: Game Check %d\n", i);
+            // check if the banner file exists
+            dolphin_game_into_t info = get_game_info(entry->path);
+            if (!info.valid) continue;
+            OSReport("Found game %s (%d)\n", entry->path, force_unload); // lets do this!
+
+            // create a new entry
+            gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
+            memset(backing, 0, sizeof(gm_file_entry_t));
+            memcpy(backing->path, entry->path, sizeof(backing->path));
+            backing->type = GM_FILE_TYPE_GAME;
+
+            // copy the extra info
+            memcpy(backing->extra.game_id, info.game_id, sizeof(backing->extra.game_id));
+            backing->extra.dvd_bnr_offset = info.bnr_offset;
+            backing->extra.dvd_bnr_type = info.bnr_type;
+
             // load the banner
-            bool bnr_loaded = gm_load_banner(entry, aram_offset, force_unload);
+            bool bnr_loaded = gm_load_banner(backing, aram_offset, force_unload);
             if (!bnr_loaded) {
                 OSReport("Failed to load banner %s\n", entry->path);
             }
             aram_offset += BNR_PIXELDATA_LEN;
 
             // load the icon
-            bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
+            bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
             if (!icon_loaded) {
                 // OSReport("Failed to load icon %s\n", entry->path);
-                entry->asset.use_banner = true;
+                backing->asset.use_banner = true;
             } else {
-                entry->asset.use_banner = false;
+                backing->asset.use_banner = false;
             }
             aram_offset += ICON_PIXELDATA_LEN;
-        } else {
+
+            // set heap pointer
+            gm_entry_backing[gm_entry_count] = backing;
+            gm_entry_count++;
+        } else if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
+            OSReport("Found other %s\n", entry->path); // lets do this!
+
+            // create a new entry
+            gm_file_entry_t *backing = gm_malloc(sizeof(gm_file_entry_t));
+            memset(backing, 0, sizeof(gm_file_entry_t));
+            memcpy(backing->path, entry->path, sizeof(backing->path));
+            backing->type = entry->type;
+
+            // get the basename
+            char *base = strrchr(entry->path, '/');
+            strcpy(backing->desc.fullGameName, base + 1);
+            strcpy(backing->desc.description, "Homebrew Program");
+
             // load the icon
-            bool icon_loaded = gm_load_icon(entry, aram_offset, force_unload);
+            bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
             if (!icon_loaded) {
                 // OSReport("Failed to load icon %s\n", entry->path);
                 continue;
             }
-            entry->asset.use_banner = false;
+            backing->asset.use_banner = false;
             aram_offset += ICON_PIXELDATA_LEN;
+
+            // set heap pointer
+            gm_entry_backing[gm_entry_count] = backing;
+            gm_entry_count++;
         }
 
-        game_backing_count = i + 1; // show the next icon
+        game_backing_count = gm_entry_count;
     }
-} 
+
+    OSReport("Total entries = %d\n", gm_entry_count);
+
+    f32 runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;
+    OSReport("Header check took=%f\n", runtime);
+    (void)runtime;
+}
 
 void gm_line_load(int line_num) {
     // OSReport("Line load %d\n", line_num);
@@ -759,7 +775,7 @@ void gm_line_changed(int delta) {
         int load_line = new_line_num - PRELOAD_LINE_COUNT + 1;
         if (load_line >= 0) {
             // load
-            OSReport("Load line %d\n", load_line);
+            // OSReport("DEBUG: Load line %d\n", load_line);
             gm_line_load(load_line);
         }
 
@@ -767,14 +783,14 @@ void gm_line_changed(int delta) {
         int unload_line = new_line_num + DRAW_TOTAL_ROWS + PRELOAD_LINE_COUNT;
         if (unload_line < number_of_lines) {
             // unload
-            OSReport("Unload line %d\n", unload_line);
+            // OSReport("DEBUG: Unload line %d\n", unload_line);
             gm_line_free(unload_line);
         }
     } else if (delta > 0) {
         int load_line = new_line_num + DRAW_TOTAL_ROWS + PRELOAD_LINE_COUNT - 1;
         if (load_line < number_of_lines) {
             // load
-            OSReport("Load line %d\n", load_line);
+            // OSReport("DEBUG: Load line %d\n", load_line);
             gm_line_load(load_line);
         }
 
@@ -782,16 +798,19 @@ void gm_line_changed(int delta) {
         int unload_line = new_line_num - PRELOAD_LINE_COUNT;
         if (unload_line >= 0) {
             // unload
-            OSReport("Unload line %d\n", unload_line);
+            // OSReport("DEBUG: Unload line %d\n", unload_line);
             gm_line_free(unload_line);
         }
     }
 
-    int icon_buf_count = gm_count_icon_buf();
-    int banner_buf_count = gm_count_banner_buf();
+    // int icon_buf_count = gm_count_icon_buf();
+    // int banner_buf_count = gm_count_banner_buf();
 
-    OSReport("icon buf count = %d\n", icon_buf_count);
-    OSReport("banner buf count = %d\n", banner_buf_count);
+    // OSReport("icon buf count = %d\n", icon_buf_count);
+    // OSReport("banner buf count = %d\n", banner_buf_count);
+
+    // int pending_free = gm_count_pending_free();
+    // OSReport("pending free = %d\n", pending_free);
 }
 
 // so grid can check if load/unload is possible
@@ -834,9 +853,8 @@ void *gm_thread_worker(void* param) {
     gm_list_info list_info = gm_list_files(target);
     gm_setup_grid(list_info.num_paths, true);
     gm_sort_files(list_info.num_paths);
-    gm_check_headers(list_info.num_paths);
+    gm_check_files(list_info.num_paths);
     gm_setup_grid(gm_entry_count, false);
-    gm_load_assets();
 
     // pmalloc_dump_stats(pm);
     return NULL;

@@ -93,7 +93,7 @@ dolphin_game_into_t get_game_info(char *game_path) {
         return (dolphin_game_into_t) { .valid = false };
     }
 
-    OSReport("DEBUG: file opened\n");
+    // OSReport("DEBUG: file opened\n");
 
     file_status_t *status = dvd_custom_status();
     if (status->result != 0) {
@@ -106,10 +106,10 @@ dolphin_game_into_t get_game_info(char *game_path) {
     __attribute__((aligned(32))) static DiskHeader header;
     dvd_threaded_read(&header, sizeof(DiskHeader), 0, status->fd); //Read in the disc header
 
-    OSReport("DEBUG: disk header loaded\n");
+    // OSReport("DEBUG: disk header loaded\n");
 
     u32 fast_bnr_offset = get_banner_offset_fast(&header);
-    OSReport("Fast BNR offset: %08x\n", fast_bnr_offset);
+    // OSReport("DEBUG: Fast BNR offset: %08x\n", fast_bnr_offset);
     if (fast_bnr_offset != 0) {
         dvd_threaded_read(small_buf, 32, fast_bnr_offset, status->fd); //Read in the banner data
 
@@ -126,7 +126,7 @@ dolphin_game_into_t get_game_info(char *game_path) {
         }
     }
 
-    OSReport("DEBUG: loading FST from disk\n");
+    // OSReport("DEBUG: loading FST from disk\n");
 
     if (header.FSTSize > 0x100000) {
         OSReport("ERROR: FST size is too large: %08x\n", header.FSTSize);
@@ -151,7 +151,7 @@ dolphin_game_into_t get_game_info(char *game_path) {
         }
     }
 
-    OSReport("DEBUG: FST was loaded\n");
+    // OSReport("DEBUG: FST was loaded\n");
 
     // invalid file
     dvd_custom_close(status->fd);

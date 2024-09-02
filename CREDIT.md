@@ -23,10 +23,11 @@
 `patches/source/ok_png.h` credit to github.com/brackeen/ok-file-formats <br/>
 `patches/source/metaphrasis.c` credit to github.com/ArminTamzarian/metaphrasis <br/>
 `patches/source/metaphrasis.h` credit to github.com/ArminTamzarian/metaphrasis <br/>
-`source/decomp_ar.c` credit to github.com/PrimeDecomp/prime <br/>
-`source/decomp_ar.h` credit to github.com/PrimeDecomp/prime <br/>
-`source/decomp_arq.c` credit to github.com/PrimeDecomp/prime <br/>
-
+`patches/source/decomp_ar.c` credit to github.com/PrimeDecomp/prime <br/>
+`patches/source/decomp_ar.h` credit to github.com/PrimeDecomp/prime <br/>
+`patches/source/decomp_arq.c` credit to github.com/PrimeDecomp/prime <br/>
+`patches/source/decomp_arq.c` credit to github.com/PrimeDecomp/prime <br/>
+`patches/source/decomp_os.h`  credit to github.com/PrimeDecomp/prime <br/>
 
 <hr/>
 
