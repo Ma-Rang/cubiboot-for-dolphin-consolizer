@@ -736,7 +736,7 @@ void gm_check_files(int path_count) {
             gm_entry_count++;
         }
 
-        udelay_threaded(100 * 1000); // test only
+        // udelay_threaded(100 * 1000); // test only
         game_backing_count = gm_entry_count;
     }
 

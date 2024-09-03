@@ -443,7 +443,8 @@ __attribute_used__ void bs2start() {
         prepare_game_lowmem(boot_path);
         char *game_code = lowmem->b_disk_info.game_code;
         bool is_tonyhawk_proskater4 = (game_code[0] == 'G' && game_code[1] == 'T' && game_code[2] == '4');
-        bool use_swiss = is_tonyhawk_proskater4 || force_swiss_boot;
+        bool is_xeno_crisis = (game_code[0] == 'G' && game_code[1] == 'C' && game_code[2] == 'R');
+        bool use_swiss = (is_tonyhawk_proskater4 || force_swiss_boot) && !is_xeno_crisis;
 
         if (use_swiss) {
             custom_OSReport("Booting ISO (swiss chainload)\n");
@@ -454,11 +455,11 @@ __attribute_used__ void bs2start() {
             int argz_len = 0;
 
             char autoload_arg[256];
-            strcpy(autoload_arg, "Autoload=fldr:");
+            strcpy(autoload_arg, "Autoload=fldrv:");
             strcat(autoload_arg, boot_path);
 
             const char *arg_list[] = {
-                "swiss-novideo.dol", // this causes Swiss to SetBlack
+                "swiss-novideo.dol", // this causes Swiss to black the screen
                 autoload_arg,
                 "AutoBoot=Yes",
                 "IGRType=Reboot",

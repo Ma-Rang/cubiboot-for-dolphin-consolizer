@@ -620,6 +620,7 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     GXColor white = {0xFF, 0xFF, 0xFF, ui_alpha};
 
     gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+    if (entry == NULL) return; // protect against transition during enum
     if (entry->extra.game_id[3] == 'J') switch_lang_jpn();
     else switch_lang_eng();
 
@@ -744,7 +745,6 @@ __attribute_used__ s32 handle_gameselect_inputs() {
                 gm_deinit_thread();
                 Jac_PlaySe(SOUND_MENU_EXIT);
                 gm_start_thread("..");
-
             } else {
                 anim_step = 0; // anim reset
                 *banner_pointer = (u32)&default_opening_bin[0]; // banner reset
