@@ -163,11 +163,11 @@ void dvd_custom_close(uint32_t fd) {
     while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
 }
 
-void dvd_set_default_fd(uint32_t fd) {
+void dvd_set_default_fd(uint32_t current_fd, uint32_t second_fd) {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
-    _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_SET_DEFAULT_FD | ((fd & 0xFF) << 16);
+    _di_regs[DI_CMDBUF0] = DVD_FLIPPY_FILEAPI_BASE | IPC_SET_DEFAULT_FD | ((current_fd & 0xFF) << 16) | ((second_fd & 0xFF) << 8);
     _di_regs[DI_CMDBUF1] = 0;
     _di_regs[DI_CMDBUF2] = 0;
 

@@ -95,12 +95,13 @@ _Static_assert(sizeof(bool) == 1); // just make sure this is a single byte
 typedef struct {
 	bool valid;
 	u8 game_id[6];
+	u8 disc_num;
+	u8 disc_ver;
 	u8 bnr_type;
 	u32 bnr_offset;
-
 } dolphin_game_into_t;
 
-_Static_assert(sizeof(dolphin_game_into_t) == 12);
+_Static_assert(sizeof(dolphin_game_into_t) == 16);
 
 dolphin_game_into_t get_game_info(char *game_path);
 

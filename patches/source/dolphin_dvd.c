@@ -120,6 +120,8 @@ dolphin_game_into_t get_game_info(char *game_path) {
             info.bnr_type = magic == BANNER_MAGIC_2; // BANNER_MULTI_LANG
             info.bnr_offset = fast_bnr_offset;
             memcpy(info.game_id, &header, 6);
+            info.disc_num = header.DiscID;
+            info.disc_ver = header.Version;
 
             dvd_custom_close(status->fd);
             return info;
@@ -143,8 +145,11 @@ dolphin_game_into_t get_game_info(char *game_path) {
         if (magic == BANNER_MAGIC_1 || magic == BANNER_MAGIC_2) {
             dolphin_game_into_t info;
             info.valid = true;
+            info.bnr_type = magic == BANNER_MAGIC_2; // BANNER_MULTI_LANG
             info.bnr_offset = bnr_info.offset;
             memcpy(info.game_id, &header, 6);
+            info.disc_num = header.DiscID;
+            info.disc_ver = header.Version;
 
             dvd_custom_close(status->fd);
             return info;

@@ -1,3 +1,5 @@
+#include <memory.h>
+
 #include "flippy_sync.h"
 #include "reloc.h"
 
@@ -7,6 +9,8 @@
 #include "picolibc.h"
 #include "boot.h"
 #include "dol.h"
+
+#include "games.h"
 
 void load_stub() {
     custom_OSReport("Loading stub...\n");
@@ -87,7 +91,7 @@ void prepare_game_lowmem(char *boot_path) {
     dvd_custom_close(file_status->fd);
 }
 
-void chainload_boot_game(char *boot_path, bool passthrough) {
+void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
     // read boot info into lowmem
     struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
     lowmem->a_boot_magic = 0x0D15EA5E;
@@ -96,14 +100,25 @@ void chainload_boot_game(char *boot_path, bool passthrough) {
 
     if (!passthrough) {
         // open file
-        dvd_custom_open(boot_path, FILE_ENTRY_TYPE_FILE, 0);
+        dvd_custom_open(boot_entry->path, FILE_ENTRY_TYPE_FILE, 0);
         file_status_t *file_status = dvd_custom_status();
         if (file_status == NULL || file_status->result != 0) {
-            custom_OSReport("Failed to open file %s\n", boot_path);
+            custom_OSReport("Failed to open file %s\n", boot_entry->path);
             return;
         }
 
-        dvd_set_default_fd(file_status->fd);
+        uint32_t first_fd = file_status->fd;
+        uint32_t second_fd = 0;
+        if (boot_entry->second != NULL) {
+            dvd_custom_open(boot_entry->second->path, FILE_ENTRY_TYPE_FILE, 0);
+            file_status_t *file_status = dvd_custom_status();
+            if (file_status == NULL || file_status->result != 0) {
+                custom_OSReport("Failed to open file %s\n", boot_entry->second->path);
+                return;
+            }
+            second_fd = file_status->fd;
+        }
+        dvd_set_default_fd(first_fd, second_fd);
     }
 
     dvd_read(&lowmem->b_disk_info, 0x20, 0, 0);

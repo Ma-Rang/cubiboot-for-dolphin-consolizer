@@ -1,5 +1,7 @@
 #include <gctypes.h>
 
+#include "games.h"
+
 #define STUB_ADDR 0x80001800
 
 typedef struct {
@@ -12,6 +14,6 @@ dol_info_t load_dol(char *path, bool flash);
 
 void *load_apploader();
 void prepare_game_lowmem(char *boot_path);
-void chainload_boot_game(char *boot_path, bool passthrough);
+void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough);
 
 void run(register void* entry_point);

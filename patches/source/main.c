@@ -488,7 +488,7 @@ __attribute_used__ void bs2start() {
             run(info.entrypoint);
         } else {
             custom_OSReport("Booting ISO (custom apploader)\n");
-            chainload_boot_game(boot_path, false);
+            chainload_boot_game(&boot_entry, false);
         }
     }
 

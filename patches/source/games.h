@@ -1,3 +1,5 @@
+#pragma once
+
 #include <gctypes.h>
 
 #include "dolphin_os.h"
@@ -61,6 +63,8 @@ typedef struct {
 
 typedef struct {
     u8 game_id[6];
+    u8 disc_num;
+    u8 disc_ver;
     u8 padding;
     u8 dvd_bnr_type;
 	u32 dvd_bnr_offset;
@@ -71,13 +75,16 @@ typedef struct {
     gm_file_type_t type;
 } gm_path_entry_t;
 
-typedef struct {
+typedef struct gm_file_entry_struct gm_file_entry_t;
+
+struct gm_file_entry_struct {
     char path[128];
     BNRDesc desc;
     gm_extra_t extra;
     gm_asset_t asset;
     gm_file_type_t type;
-} gm_file_entry_t;
+    gm_file_entry_t *second;
+};
 
 extern int number_of_lines;
 extern int game_backing_count;

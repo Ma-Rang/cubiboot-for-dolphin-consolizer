@@ -22,6 +22,7 @@ int sprintf(char* s, const char* format, ...);
 
 #endif
 
+int memcmp(const void *m1, const void *m2, size_t n);
 void *memmove(void *dst, const void *src, size_t length);
 void *memcpy(void* dst, const void* src, size_t count);
 void *memset (void *m, int c, size_t n);

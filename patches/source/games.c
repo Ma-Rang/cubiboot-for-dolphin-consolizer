@@ -682,6 +682,8 @@ void gm_check_files(int path_count) {
 
             // copy the extra info
             memcpy(backing->extra.game_id, info.game_id, sizeof(backing->extra.game_id));
+            backing->extra.disc_num = info.disc_num;
+            backing->extra.disc_ver = info.disc_ver;
             backing->extra.dvd_bnr_offset = info.bnr_offset;
             backing->extra.dvd_bnr_type = info.bnr_type;
 
@@ -741,6 +743,25 @@ void gm_check_files(int path_count) {
     }
 
     OSReport("Total entries = %d\n", gm_entry_count);
+
+    // find multi-disc games
+    for (int i = 0; i < gm_entry_count; i++) {
+        gm_file_entry_t *entry = gm_entry_backing[i];
+        if (entry->type != GM_FILE_TYPE_GAME) continue;
+
+        for (int j = 0; j < gm_entry_count; j++) {
+            gm_file_entry_t *entry2 = gm_entry_backing[j];
+            if (entry2->type != GM_FILE_TYPE_GAME) continue;
+            if (entry2 == entry) continue;
+
+            // check if the game is multi-disc
+            bool is_same_game = memcmp(entry2->extra.game_id, entry2->extra.game_id, 6) == 0;
+            bool is_different_disc = entry->extra.disc_num != entry2->extra.disc_num;
+            if (is_same_game && is_different_disc) {
+                entry->second = entry2;
+            }
+        }
+    }
 
     f32 runtime = (f32)diff_usec(start_time, gettime()) / 1000.0;
     OSReport("Header check took=%f\n", runtime);
