@@ -748,6 +748,9 @@ void gm_check_files(int path_count) {
     for (int i = 0; i < gm_entry_count; i++) {
         gm_file_entry_t *entry = gm_entry_backing[i];
         if (entry->type != GM_FILE_TYPE_GAME) continue;
+        if (entry->extra.disc_num == 0) continue; // check Disc 2 only
+
+        OSReport("Checking multi-disc %s[%d] (%d)\n", entry->path, i, entry->extra.disc_num);
 
         for (int j = 0; j < gm_entry_count; j++) {
             gm_file_entry_t *entry2 = gm_entry_backing[j];
@@ -755,10 +758,12 @@ void gm_check_files(int path_count) {
             if (entry2 == entry) continue;
 
             // check if the game is multi-disc
-            bool is_same_game = memcmp(entry2->extra.game_id, entry2->extra.game_id, 6) == 0;
+            bool is_same_game = memcmp(entry->extra.game_id, entry2->extra.game_id, 6) == 0;
             bool is_different_disc = entry->extra.disc_num != entry2->extra.disc_num;
             if (is_same_game && is_different_disc) {
+                OSReport("Found multi-disc %s[%d] (%d)\n", entry2->path, j, entry2->extra.disc_num);
                 entry->second = entry2;
+                entry2->second = entry;
             }
         }
     }

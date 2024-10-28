@@ -790,7 +790,12 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
 
         extern gm_file_entry_t boot_entry;
+        extern gm_file_entry_t second_boot_entry;
         memcpy(&boot_entry, entry, sizeof(gm_file_entry_t));
+        if (boot_entry.second != NULL) {
+            memcpy(&second_boot_entry, boot_entry.second, sizeof(gm_file_entry_t));
+            boot_entry.second = &second_boot_entry;
+        }
         *bs2start_ready = 1;
     }
 

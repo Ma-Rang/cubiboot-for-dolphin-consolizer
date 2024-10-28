@@ -37,14 +37,17 @@
 // __attribute_reloc__ u32 (*InitializeUART)(u32);
 // __attribute_reloc__ s32 (*WriteUARTN)(const void *buf, u32 len);
 
-// s32 dolphin_WriteUARTN(const void *buf, u32 len) {
+// stub
+s32 dolphin_WriteUARTN(const void *buf, u32 len) {
 //   if (*uart_init == 0) {
 //     InitializeUART(0xe100);
 //     *uart_init = 1;
 //   }
 
 //     return WriteUARTN(buf, len);
-// }
+
+    return 0;
+}
 
 #define custom_WriteUARTN dolphin_WriteUARTN
 

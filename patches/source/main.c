@@ -79,6 +79,7 @@ __attribute_data__ static GXColorS10 color_bg_outer_1;
 
 // start
 __attribute_data__ gm_file_entry_t boot_entry;
+__attribute_data__ gm_file_entry_t second_boot_entry;
 
 __attribute_used__ void mod_cube_colors() {
     if (cube_color == 0) {

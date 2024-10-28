@@ -44,10 +44,10 @@ void load_settings() {
         return;
     }
 
-    ((char*)config_buf)[config_size - 1] = '\0';
+    ((char*)config_buf)[config_size] = '\0';
 
     // iprintf("DUMP:\n");
-    // iprintf("%s\n\n", (char*)config_buf);
+    // iprintf("%s[END]\n\n", (char*)config_buf);
 
     ini_t *conf = ini_load(config_buf, config_size);
 

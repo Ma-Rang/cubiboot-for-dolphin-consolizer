@@ -49,7 +49,8 @@ int iprintf(const char *fmt, ...) {
     // length = sprintf(buf, "(%f): %s", (f32)diff_usec(first_print, gettime()) / 1000.0, line);
     length = vsnprintf(buf, sizeof(buf), fmt, args);
 
-    write(2, buf, length);
+    // write(2, buf, length);
+    usb_sendbuffer(EXI_CHANNEL_1, buf, length);
 
     va_end(args);
     IRQ_Restore(level);
