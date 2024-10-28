@@ -865,10 +865,10 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     return MENU_GAMESELECT_TRANSITION_ID;
 }
 
-void alpha_watermark(void) {
-    prep_text_mode();
+// void alpha_watermark(void) {
+//     prep_text_mode();
 
-    GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
-    draw_text("BETA TEST", 24, 330, 0, &yellow_alpha);
-    draw_text("cubeboot rc" CONFIG_BETA_RC, 22, 330, 28, &yellow_alpha);
-}
+//     GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
+//     draw_text("BETA TEST", 24, 330, 0, &yellow_alpha);
+//     draw_text("cubeboot rc" CONFIG_BETA_RC, 22, 330, 28, &yellow_alpha);
+// }

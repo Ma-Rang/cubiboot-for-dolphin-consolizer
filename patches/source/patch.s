@@ -49,8 +49,8 @@ patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0
 patch_inst_ntsc "_patch_thread_init" 0x81301234 0x81301070 0x81301424 0x81301428 bl pre_thread_init
 patch_inst_pal "_patch_thread_init" 0x81301070 0x81301070 0x813011dc bl pre_thread_init
 
-patch_inst_ntsc "_draw_watermark" 0x81314898 0x81314bb0 0x81314f48 0x81314f60 bl alpha_watermark
-patch_inst_pal "_draw_watermark" 0x81315630 0x81314adc 0x81315770 bl alpha_watermark
+// patch_inst_ntsc "_draw_watermark" 0x81314898 0x81314bb0 0x81314f48 0x81314f60 bl alpha_watermark
+// patch_inst_pal "_draw_watermark" 0x81315630 0x81314adc 0x81315770 bl alpha_watermark
 
 patch_inst_ntsc "_gameselect_replace_draw" 0x81314200 0x81314518 0x813148b0 0x813148c8 bl mod_gameselect_draw
 patch_inst_pal "_gameselect_replace_draw" 0x81314e58 0x81314444 0x81314f98 bl mod_gameselect_draw
