@@ -27,6 +27,7 @@ extern const void _edata;
 
 u8 *dol_buf;
 
+#if 0
 bool check_load_program() {
     // check if we can even load files
     if (!is_device_mounted()) return false;
@@ -58,6 +59,7 @@ bool check_load_program() {
 
     return found_file;
 }
+#endif
 
 bool load_cli_file(char *path, cli_params *params) {
     char cli_path[255];

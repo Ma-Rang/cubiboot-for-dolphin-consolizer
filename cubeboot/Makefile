@@ -21,7 +21,7 @@ include $(DEVKITPRO)/libogc2/gamecube_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/fatfs source/pff source/pngu source/boot
+SOURCES		:=	source source/pngu source/boot
 DATA		:=	data  
 INCLUDES	:=	include
 
@@ -46,7 +46,7 @@ LDFLAGS	=	$(MACHDEP) -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:= -lasnd -logc -lpng16 -lz -lz -lm -lfat
+LIBS	:= -lasnd -logc -lpng16 -lz -lz -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

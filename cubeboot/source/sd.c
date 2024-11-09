@@ -14,6 +14,7 @@
 #include "halt.h"
 #include "helpers.h"
 
+#if 0
 #ifndef USE_FAT_PFF
 typedef uint64_t LBA_t;
 typedef unsigned char BYTE;
@@ -43,7 +44,6 @@ static void drive_info_callback(s32 result, dvdcmdblk *blk) {
         has_drive = 0;
     }
 }
-
 
 // check for inserted
 static int check_available_devices() {
@@ -140,6 +140,7 @@ const char *get_current_dev_name() {
 const DISC_INTERFACE *get_current_device() {
     return current_device;
 }
+#endif
 
 int get_file_size(char *path) {
     PATH_FIX(path);

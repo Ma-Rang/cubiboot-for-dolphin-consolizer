@@ -41,6 +41,8 @@
 
 #include "flippy_sync.h"
 
+#define DEFAULT_FIFO_SIZE (256 * 1024)
+
 #define STUB_ADDR 0x80001800
 
 #define BS2_BASE_ADDR 0x81300000
@@ -130,7 +132,29 @@ int main(int argc, char **argv) {
 	VIDEO_SetBlack(FALSE);
 	VIDEO_Flush();
 	VIDEO_WaitVSync();
-	if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
+    if (rmode->viTVMode & VI_NON_INTERLACE) {
+        VIDEO_WaitVSync();
+    }
+    else {
+        while (VIDEO_GetNextField())
+            VIDEO_WaitVSync();
+    }
+
+    // setup the fifo and then init the flipper
+    void *gp_fifo = NULL;
+    gp_fifo = memalign(32, DEFAULT_FIFO_SIZE);
+    memset(gp_fifo, 0, DEFAULT_FIFO_SIZE);
+
+    GX_Init(gp_fifo, DEFAULT_FIFO_SIZE);
+
+    // clears the bg to color and clears the z buffer
+    GX_SetCopyClear((GXColor){0x00, 0x00, 0x00, 0xff}, 0x00ffffff);
+
+    GX_ClearVtxDesc();
+    GX_InvVtxCache();
+    GX_InvalidateTexAll();
+
+    VIDEO_SetBlack(FALSE); // for good measure
     // // debug above
 #endif
 
