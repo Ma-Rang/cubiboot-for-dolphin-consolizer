@@ -11,7 +11,6 @@
 #include "sd.h"
 
 #include "print.h"
-#include "helpers.h"
 #include "halt.h"
 
 #include "descrambler.h"
@@ -82,8 +81,8 @@ extern u32 diff_msec(s64 start,s64 end);
 
 static bool valid = false;
 
-void load_ipl() {
-    if (is_dolphin()) {
+void load_ipl(bool is_running_dolphin) {
+    if (is_running_dolphin) {
         __SYS_ReadROM(bs2, bs2_size, BS2_CODE_OFFSET); // IPL is not encrypted on Dolphin
         iprintf("TEST IPL D, %08x\n", *(u32*)bs2);
     } else {
@@ -98,7 +97,7 @@ void load_ipl() {
     }
 
 #ifdef TEST_IPL_PATH
-    int ret = dvd_custom_open(TEST_IPL_PATH, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
+    int ret = dvd_custom_open(TEST_IPL_PATH, FILE_ENTRY_TYPES_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
     iprintf("OPEN ret: %08x\n", ret);
     GCN_ALIGNED(file_status_t) status;
     dvd_custom_status(&status);

@@ -465,7 +465,7 @@ gm_list_info gm_list_files(const char *target_dir) {
     OSReport("Listing files in %s\n", target_dir);
     u64 start_time = gettime();
 
-    int res = dvd_custom_open(target_dir, FILE_ENTRY_TYPE_DIR, 0);
+    int res = dvd_custom_open(target_dir, FILE_ENTRY_TYPES_DIR, 0);
     if (res != 0) {
         OSReport("PANIC: SD Card could not be opened\n");
         while(1);
@@ -490,13 +490,11 @@ gm_list_info gm_list_files(const char *target_dir) {
     while(1) {
         int ret = dvd_custom_readdir(&ent, dir_fd);
         if (ret != 0) ipl_panic();
-
         if (ent.name[0] == 0) break; // end of directory
-        // if (ent.type == FILE_ENTRY_TYPE_DIR) continue; // TODO: add DIR listing
 
         // only check file ext for now
         gm_file_type_t file_type = GM_FILE_TYPE_UNKNOWN;
-        if (ent.type == FILE_ENTRY_TYPE_DIR) {
+        if (ent.types & FILE_ENTRY_TYPES_DIR) {
             file_type = GM_FILE_TYPE_DIRECTORY;
         } else {
             file_type = gm_get_file_type(ent.name);
@@ -506,7 +504,7 @@ gm_list_info gm_list_files(const char *target_dir) {
 
 #ifdef PRINT_READDIR_NAMES
         // logging
-        OSReport("READDIR ent(%u): %s [len=%d]\n", ent.type, ent.name, strlen(ent.name));
+        OSReport("READDIR ent(%u): %s [len=%d]\n", ent.types, ent.name, strlen(ent.name));
 #endif
 
         // combine the path
@@ -514,7 +512,7 @@ gm_list_info gm_list_files(const char *target_dir) {
         strcat(file_full_path_buf, ent.name);
 #ifdef PRINT_READDIR_NAMES
         // logging
-        OSReport("PATH ent(%u): %s\n", ent.type, file_full_path_buf);
+        OSReport("PATH ent(%u): %s\n", ent.types, file_full_path_buf);
 #endif
 
         // store the path
@@ -555,7 +553,7 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
     if (entry->extra.dvd_bnr_offset == 0) return false;
 
     // load the banner
-    dvd_custom_open(entry->path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLESPEEDEMU);
+    dvd_custom_open(entry->path, FILE_ENTRY_TYPES_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLESPEEDEMU);
     file_status_t *status = dvd_custom_status();
     if (status == NULL || status->result != 0) {
         OSReport("ERROR: could not open file\n");
@@ -598,7 +596,7 @@ static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unl
     strcpy(ext, ".png");
 
     // load the icon
-    dvd_custom_open(icon_path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
+    dvd_custom_open(icon_path, FILE_ENTRY_TYPES_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
     file_status_t *status = dvd_custom_status();
     if (status == NULL || status->result != 0) {
         // OSReport("ERROR: could not open icon file\n");
@@ -695,13 +693,16 @@ void gm_check_files(int path_count) {
             aram_offset += BNR_PIXELDATA_LEN;
 
             // load the icon
-            bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
-            if (!icon_loaded) {
-                // OSReport("Failed to load icon %s\n", entry->path);
-                backing->asset.use_banner = true;
-            } else {
-                backing->asset.use_banner = false;
-            }
+            backing->asset.use_banner = true;
+
+            // bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
+            // if (!icon_loaded) {
+            //     // OSReport("Failed to load icon %s\n", entry->path);
+            //     backing->asset.use_banner = true;
+            // } else {
+            //     backing->asset.use_banner = false;
+            // }
+            backing->asset.use_banner = true;
             aram_offset += ICON_PIXELDATA_LEN;
 
             // set heap pointer
@@ -725,11 +726,11 @@ void gm_check_files(int path_count) {
                 strcpy(backing->desc.description, "Directory");
             }
 
-            // load the icon
-            bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
-            if (!icon_loaded) {
-                // OSReport("Failed to load icon %s\n", entry->path);
-            }
+            // // load the icon
+            // bool icon_loaded = gm_load_icon(backing, aram_offset, force_unload);
+            // if (!icon_loaded) {
+            //     // OSReport("Failed to load icon %s\n", entry->path);
+            // }
             backing->asset.use_banner = false;
             aram_offset += ICON_PIXELDATA_LEN;
 

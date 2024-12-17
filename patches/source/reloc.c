@@ -1,6 +1,9 @@
 #include "reloc.h"
 #include "attr.h"
 
+// used as extern
+__attribute_data__ BOOL is_running_dolphin;
+
 #ifdef DEBUG
 // This is actually BS2Report on IPL rev 1.2
 __attribute_reloc__ void (*OSReport)(const char* text, ...);

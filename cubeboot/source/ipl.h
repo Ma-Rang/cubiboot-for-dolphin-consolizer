@@ -30,5 +30,5 @@ typedef struct {
 
 extern bios_item *current_bios;
 
-void load_ipl();
+void load_ipl(bool is_running_dolphin);
 u32 get_sda_address();

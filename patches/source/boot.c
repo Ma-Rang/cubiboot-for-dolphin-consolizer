@@ -14,7 +14,7 @@
 
 void load_stub() {
     custom_OSReport("Loading stub...\n");
-    dvd_custom_open_flash("/stub.bin", FILE_ENTRY_TYPE_FILE, 0);
+    dvd_custom_open_flash("/stub.bin", FILE_ENTRY_TYPES_FILE, 0);
     file_status_t *file_status = dvd_custom_status();
     if (file_status == NULL || file_status->result != 0) {
         custom_OSReport("Failed to open stub\n");
@@ -36,9 +36,9 @@ __attribute__((aligned(32))) static DOLHEADER dol_hdr;
 dol_info_t load_dol(char *path, bool flash) {
     uint8_t flags = IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK | IPC_FILE_FLAG_DISABLESPEEDEMU;
     if (flash) {
-        dvd_custom_open_flash(path, FILE_ENTRY_TYPE_FILE, flags);
+        dvd_custom_open_flash(path, FILE_ENTRY_TYPES_FILE, flags);
     } else {
-        dvd_custom_open(path, FILE_ENTRY_TYPE_FILE, flags);
+        dvd_custom_open(path, FILE_ENTRY_TYPES_FILE, flags);
     }
 
     file_status_t *file_status = dvd_custom_status();
@@ -79,7 +79,7 @@ dol_info_t load_dol(char *path, bool flash) {
 
 void prepare_game_lowmem(char *boot_path) {
     // open file
-    dvd_custom_open(boot_path, FILE_ENTRY_TYPE_FILE, 0);
+    dvd_custom_open(boot_path, FILE_ENTRY_TYPES_FILE, 0);
     file_status_t *file_status = dvd_custom_status();
     if (file_status == NULL || file_status->result != 0) {
         custom_OSReport("Failed to open file %s\n", boot_path);
@@ -100,7 +100,7 @@ void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
 
     if (!passthrough) {
         // open file
-        dvd_custom_open(boot_entry->path, FILE_ENTRY_TYPE_FILE, 0);
+        dvd_custom_open(boot_entry->path, FILE_ENTRY_TYPES_FILE, 0);
         file_status_t *file_status = dvd_custom_status();
         if (file_status == NULL || file_status->result != 0) {
             custom_OSReport("Failed to open file %s\n", boot_entry->path);
@@ -112,7 +112,7 @@ void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
         custom_OSReport("Boot entry: %s\n", boot_entry->path);
         if (boot_entry->second != NULL) {
             custom_OSReport("Second entry: %s (valid: %d, %p)\n", boot_entry->second->path, boot_entry->second->second == boot_entry, boot_entry->second);
-            dvd_custom_open(boot_entry->second->path, FILE_ENTRY_TYPE_FILE, 0);
+            dvd_custom_open(boot_entry->second->path, FILE_ENTRY_TYPES_FILE, 0);
             file_status_t *file_status = dvd_custom_status();
             if (file_status == NULL || file_status->result != 0) {
                 custom_OSReport("Failed to open file %s\n", boot_entry->second->path);

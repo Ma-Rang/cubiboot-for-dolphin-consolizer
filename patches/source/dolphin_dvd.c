@@ -87,7 +87,7 @@ dolphin_game_into_t get_game_info(char *game_path) {
     __attribute__((aligned(32))) static u32 small_buf[8]; // for BNR reads
 
     const uint8_t flags = IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLESPEEDEMU;
-    int ret = dvd_custom_open(game_path, T_FILE, flags);
+    int ret = dvd_custom_open(game_path, FILE_ENTRY_TYPES_FILE, flags);
     if (ret != 0) {
         OSReport("ERROR: Failed to open %s\n", game_path);
         return (dolphin_game_into_t) { .valid = false };

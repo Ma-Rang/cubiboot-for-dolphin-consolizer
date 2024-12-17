@@ -206,7 +206,8 @@ int main(int argc, char **argv) {
 //// fun stuff
 
     // load ipl
-    load_ipl();
+    bool is_running_dolphin = is_dolphin();
+    load_ipl(is_running_dolphin);
 
     // disable progressive on unsupported IPLs
     if (current_bios->version == IPL_NTSC_10) {
@@ -356,6 +357,9 @@ int main(int argc, char **argv) {
 
     set_patch_value(symshdr, syment, symstringdata, "preboot_delay_ms", settings.preboot_delay_ms);
     set_patch_value(symshdr, syment, symstringdata, "postboot_delay_ms", settings.postboot_delay_ms);
+
+    // Copy other variables
+    set_patch_value(symshdr, syment, symstringdata, "is_running_dolphin", is_running_dolphin);
 
     // unmount_current_device();
 

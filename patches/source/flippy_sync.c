@@ -66,86 +66,6 @@ dvd_info_t *dvd_inquiry() {
     return &info;
 }
 
-// === bootloader commands
-
-int dvd_bootloader_status(firmware_status_blob_t* dst) {
-    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-    _di_regs[DI_CVR] = 0; // clear cover int
-
-    _di_regs[DI_CMDBUF0] = DVD_FLIPPY_BOOTLOADER_STATUS;
-    _di_regs[DI_CMDBUF1] = 0;
-    _di_regs[DI_CMDBUF2] = 0;
-
-    _di_regs[DI_MAR] = (u32)dst & 0x1FFFFFFF;
-    _di_regs[DI_LENGTH] = sizeof(firmware_status_blob_t);
-    _di_regs[DI_CR] = (DI_CR_DMA | DI_CR_TSTART); // start transfer
-
-    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-
-    DCInvalidateRange(dst, sizeof(firmware_status_blob_t));
-
-    // fix string termination
-    dst->status_text[63] = 0;
-    dst->status_sub[63] = 0;
-
-    // check if ERR was asserted
-    if (_di_regs[DI_SR] & DI_SR_DEINT) {
-        return 1;
-    }
-    return 0;
-}
-
-void dvd_bootloader_boot() {
-    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-    _di_regs[DI_CVR] = 0; // clear cover int
-
-    _di_regs[DI_CMDBUF0] = DVD_OEM_INQUIRY;
-    _di_regs[DI_CMDBUF1] = 0xabadbeef;
-    _di_regs[DI_CMDBUF2] = 0xcafe6969;
-
-    _di_regs[DI_MAR] = 0;
-    _di_regs[DI_LENGTH] = 0;
-    _di_regs[DI_CR] = DI_CR_TSTART;
-
-    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-
-    return;
-}
-
-void dvd_bootloader_update() {
-    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-    _di_regs[DI_CVR] = 0; // clear cover int
-
-    _di_regs[DI_CMDBUF0] = DVD_OEM_INQUIRY;
-    _di_regs[DI_CMDBUF1] = 0xabadbeef;
-    _di_regs[DI_CMDBUF2] = 0xdabfed69;
-
-    _di_regs[DI_MAR] = 0;
-    _di_regs[DI_LENGTH] = 0;
-    _di_regs[DI_CR] = DI_CR_TSTART;
-
-    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-
-    return;
-}
-
-void dvd_bootloader_noupdate() {
-    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
-    _di_regs[DI_CVR] = 0; // clear cover int
-
-    _di_regs[DI_CMDBUF0] = DVD_OEM_INQUIRY;
-    _di_regs[DI_CMDBUF1] = 0xabadbeef;
-    _di_regs[DI_CMDBUF2] = 0xdecaf420;
-
-    _di_regs[DI_MAR] = 0;
-    _di_regs[DI_LENGTH] = 0;
-    _di_regs[DI_CR] = DI_CR_TSTART;
-
-    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-
-    return;
-}
-
 // === flippy custom commands
 
 void dvd_custom_close(uint32_t fd) {
@@ -345,7 +265,7 @@ int dvd_custom_open(const char *path, uint8_t type, uint8_t flags) {
 
     strncpy(entry.name, path, 256);
     entry.name[255] = 0;
-    entry.type = type;
+    entry.types = type;
     entry.flags = flags;
 
     DCFlushRange(&entry, sizeof(file_entry_t));
@@ -376,7 +296,7 @@ int dvd_custom_open_flash(const char *path, uint8_t type, uint8_t flags) {
 
     strncpy(entry.name, path, 256);
     entry.name[255] = 0;
-    entry.type = type;
+    entry.types = type;
     entry.flags = flags;
 
     DCFlushRange(&entry, sizeof(file_entry_t));
