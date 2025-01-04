@@ -61,6 +61,13 @@ typedef struct {
     gm_banner_t banner;
 } gm_asset_t;
 
+typedef struct gm_disc_header {
+    char game_code[4];
+	char maker_code[2];
+	char disk_id;
+	char version;
+} gm_disc_header_t;
+
 typedef struct {
     u8 game_id[6];
     u8 disc_num;

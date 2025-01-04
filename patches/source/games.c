@@ -444,13 +444,9 @@ static void ipl_panic() {
 
 static char *hidden_file_names[] = {
     // Windows
-    "desktop.ini",
-    "Thumbs.db",
     "$RECYCLE.BIN",
     "System Volume Information",
     "Recovery",
-    "Recovery.txt",
-    "autorun.inf",
     // GameCube
     "swiss",
     "MCBACKUP",
@@ -1037,6 +1033,3 @@ void gm_deinit_thread() {
     }
 }
 
-void gm_debug_func() {
-    
-}

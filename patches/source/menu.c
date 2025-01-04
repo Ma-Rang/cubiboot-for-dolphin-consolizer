@@ -25,9 +25,9 @@
 #include "time.h"
 
 // TODO: this is all zeros except for one BNRDesc, so replace it with a sparse version
-#include "../build/default_opening_bin.h"
-#include "../../cubeboot/include/gcm.h"
-#include "../../cubeboot/include/bnr.h"
+#include "default_opening_bin.h"
+#include "gcm.h"
+#include "bnr.h"
 
 // for setup
 __attribute_reloc__ void (*menu_alpha_setup)();
@@ -779,10 +779,9 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         }
     }
 
-    if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
-        extern void gm_debug_func();
-        gm_debug_func();
-    }
+    // if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
+    //     ...
+    // }
 
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();
@@ -865,10 +864,12 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     return MENU_GAMESELECT_TRANSITION_ID;
 }
 
-// void alpha_watermark(void) {
-//     prep_text_mode();
+__attribute_data__ u8 show_watermark = 1;
+void alpha_watermark(void) {
+    if (!show_watermark) return;
+    prep_text_mode();
 
-//     GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
-//     draw_text("BETA TEST", 24, 330, 0, &yellow_alpha);
-//     draw_text("cubeboot rc" CONFIG_BETA_RC, 22, 330, 28, &yellow_alpha);
-// }
+    GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
+    draw_text("BETA TEST", 24, 330, 0, &yellow_alpha);
+    draw_text("cubeboot rc" CONFIG_BETA_RC, 22, 330, 28, &yellow_alpha);
+}

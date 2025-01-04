@@ -2,6 +2,7 @@
 
 #include "flippy_sync.h"
 #include "reloc.h"
+#include "attr.h"
 
 #include "dolphin_os.h"
 #include "video.h"
@@ -11,6 +12,7 @@
 #include "dol.h"
 
 #include "games.h"
+#include "mcp.h"
 
 void load_stub() {
     custom_OSReport("Loading stub...\n");
@@ -77,6 +79,60 @@ dol_info_t load_dol(char *path, bool flash) {
     return info;
 }
 
+void chainload_swiss_game(char *game_path, bool passthrough, bool enable_patches) {
+    dol_info_t info = load_dol("/swiss-gc.dol", true);
+
+    char *argz = (void*)info.max_addr + 32;
+    int argz_len = 0;
+
+    char autoload_arg[256];
+    if (passthrough) {
+        strcpy(autoload_arg, "Autoload=dvd:/");
+    } else {
+        strcpy(autoload_arg, "Autoload=fldrv:");
+        strcat(autoload_arg, game_path);
+    }
+
+    char cleanboot_arg[32];
+    if (enable_patches) {
+        strcpy(cleanboot_arg, "Prefer Clean Boot=");
+        strcat(cleanboot_arg, "No");
+    } else {
+        strcpy(cleanboot_arg, "Prefer Clean Boot=");
+        strcat(cleanboot_arg, "Yes");
+    }
+
+    const char *arg_list[] = {
+        "swiss-novideo.dol", // this causes Swiss to black the screen
+        autoload_arg,
+        "AutoBoot=Yes",
+        "IGRType=Reboot",
+        "BS2Boot=No",
+        cleanboot_arg,
+        NULL
+    };
+
+    int arg_count = 0;
+    while(arg_list[arg_count] != NULL) {
+        const char *arg = arg_list[arg_count];
+        int arg_len = strlen(arg) + 1;
+        memcpy(argz + argz_len, arg, arg_len);
+        argz_len += arg_len;
+        arg_count++;
+    }
+
+    struct __argv *args = (void*)(info.entrypoint + 8);
+    args->argvMagic = ARGV_MAGIC;
+    args->commandLine = argz;
+    args->length = argz_len;
+
+    DCFlushRange(argz, argz_len);
+    DCFlushRange(args, sizeof(struct __argv));
+
+    run(info.entrypoint);
+}
+
+#if 0
 void prepare_game_lowmem(char *boot_path) {
     // open file
     dvd_custom_open(boot_path, FILE_TYPE_FLAG_FILE, 0);
@@ -90,8 +146,9 @@ void prepare_game_lowmem(char *boot_path) {
     dvd_read(&lowmem->b_disk_info, 0x20, 0, file_status->fd);
     dvd_custom_close(file_status->fd);
 }
+#endif
 
-void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
+void legacy_chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
     // read boot info into lowmem
     struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
     lowmem->a_boot_magic = 0x0D15EA5E;
@@ -127,7 +184,6 @@ void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
     void *entrypoint = load_apploader();
 
     struct gcm_disk_header_info *bi2 = lowmem->a_bi2;
-
     custom_OSReport("BI2: %08x\n", bi2);
     custom_OSReport("Country: %x\n", bi2->country_code);
 

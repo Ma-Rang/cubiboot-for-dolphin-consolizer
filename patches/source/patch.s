@@ -3,7 +3,8 @@
 #include "patch_asm.h"
 
 // patch_inst vNTSC_11(_change_background_color) 0x81481cc8 .4byte 0x000435FF
-// patch_inst vNTSC_11(_test_only_a) 0x8130bcfc li r0, 2
+// patch_inst vNTSC_11(_test_only_a) 0x8131e360 bl mega_trap
+
 // patch_inst vNTSC_11(_test_only_b) 0x81301448 bl before_audio_init
 // patch_inst vNTSC_11(_gameselect_hide_cubes) 0x81327454 nop
 // patch_inst vNTSC_11(_skip_menu_logo_a) 0x8130bcb4 li r3, 1
@@ -39,6 +40,13 @@ patch_inst_pal "_patch_card_info_b" 0x8131b674 0x8131abf4 0x8131b7b4 bl patched_
 patch_inst_ntsc "_fix_card_info" 0x81319000 0x81319600 0x81319998 0x813199b0 bl fix_card_info
 patch_inst_pal "_fix_card_info" 0x81319fac 0x8131952c 0x8131a0ec bl fix_card_info
 
+// this forces some control flow in an unused card thread function
+patch_inst_ntsc "_skip_card_slot_checks" 0x8131dc14 0x8131e340 0x8131e6d8 0x8131e6f0 li r0, 0
+patch_inst_pal "_skip_card_slot_checks" 0x8131ecec 0x8131e26c 0x8131ee2c li r0, 0
+
+patch_inst_ntsc "_patch_custom_card_handler" 0x8131dccc 0x8131e3f8 0x8131e790 0x8131e7a8 bl pre_custom_card_OSSendMessage
+patch_inst_pal "_patch_custom_card_handler" 0x8131eda4 0x8131e324 0x8131eee4 bl pre_custom_card_OSSendMessage
+
 patch_inst_ntsc "_reduce_arena_size" 0x813328ec 0x8135825c 0x8135d998 0x8135d998 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
 patch_inst_pal "_reduce_arena_size" 0x8135b83c 0x8135817c 0x81360d10 lis r3, -0x7ea0 // 0x81700000 -> 0x81600000
 
@@ -49,8 +57,8 @@ patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0
 patch_inst_ntsc "_patch_thread_init" 0x81301234 0x81301070 0x81301424 0x81301428 bl pre_thread_init
 patch_inst_pal "_patch_thread_init" 0x81301070 0x81301070 0x813011dc bl pre_thread_init
 
-// patch_inst_ntsc "_draw_watermark" 0x81314898 0x81314bb0 0x81314f48 0x81314f60 bl alpha_watermark
-// patch_inst_pal "_draw_watermark" 0x81315630 0x81314adc 0x81315770 bl alpha_watermark
+patch_inst_ntsc "_draw_watermark" 0x81314898 0x81314bb0 0x81314f48 0x81314f60 bl alpha_watermark
+patch_inst_pal "_draw_watermark" 0x81315630 0x81314adc 0x81315770 bl alpha_watermark
 
 patch_inst_ntsc "_gameselect_replace_draw" 0x81314200 0x81314518 0x813148b0 0x813148c8 bl mod_gameselect_draw
 patch_inst_pal "_gameselect_replace_draw" 0x81314e58 0x81314444 0x81314f98 bl mod_gameselect_draw

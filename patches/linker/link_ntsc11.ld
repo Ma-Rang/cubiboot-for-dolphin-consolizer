@@ -94,3 +94,12 @@ ntsc11_OSWakeupThread = 0x81360078;
 
 ntsc11_GXSetCurrentMtx = 0x81376938;
 ntsc11_ARQPostRequest = 0x8136ab80;
+
+ntsc11_CARDProbe = 0x8136da28;
+ntsc11_EXILock = 0x8135b7cc;
+ntsc11_EXIUnlock = 0x8135b8c0;
+ntsc11_EXISelect = 0x8135b16c;
+ntsc11_EXIDeselect = 0x8135b298;
+ntsc11_EXISync = 0x8135ab5c;
+ntsc11_EXIImm = 0x8135a774;
+ntsc11_EXIImmEx = 0x8135a9d0;

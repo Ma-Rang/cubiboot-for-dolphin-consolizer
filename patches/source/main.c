@@ -42,6 +42,7 @@ __attribute_data__ u32 start_passthrough_game = 0;
 __attribute_data__ u8 *cube_text_tex = NULL;
 __attribute_data__ u32 force_progressive = 0;
 __attribute_data__ u32 force_swiss_boot = 0;
+__attribute_data__ u32 force_legacy_boot = 0;
 
 // __attribute_data__ static cubeboot_state local_state;
 // __attribute_data__ static cubeboot_state *global_state = (cubeboot_state*)0x81700000;
@@ -380,7 +381,7 @@ __attribute_used__ u32 bs2tick() {
 }
 
 __attribute_used__ void bs2start() {
-    OSReport("DONE\n");
+    OSReport("DONE ALL GAME\n");
     if (!start_passthrough_game) {
          gm_deinit_thread();
     }
@@ -410,25 +411,29 @@ __attribute_used__ void bs2start() {
 
     // Passthrough mode
     if (start_passthrough_game) {
-        dvd_custom_bypass_enter();
-        udelay(10 * 1000);
-
-        int ret = dvd_read_id();
-        int err = dvd_get_error();
-        if (ret != 0 || err != 0) {
-            custom_OSReport("Failed to read disc ID\n");
-            dvd_custom_bypass_exit();
+        if (force_legacy_boot) {
+            dvd_custom_bypass_enter();
             udelay(10 * 1000);
 
-            load_stub(); // exit to loader again
-            u32 *sig = (u32*)0x80001804;
-            if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
-                static void (*reload)(void) = (void(*)(void))0x80001800;
-                run(reload);
-            }
-        }
+            int ret = dvd_read_id();
+            int err = dvd_get_error();
+            if (ret != 0 || err != 0) {
+                custom_OSReport("Failed to read disc ID\n");
+                dvd_custom_bypass_exit();
+                udelay(10 * 1000);
 
-        chainload_boot_game(NULL, true);
+                load_stub(); // exit to loader again
+                u32 *sig = (u32*)0x80001804;
+                if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
+                    static void (*reload)(void) = (void(*)(void))0x80001800;
+                    run(reload);
+                }
+            }
+
+            legacy_chainload_boot_game(NULL, true);
+        } else {
+            chainload_swiss_game(NULL, true, false);
+        }
     }
 
     char *boot_path = boot_entry.path;
@@ -441,55 +446,16 @@ __attribute_used__ void bs2start() {
     } else {
         custom_OSReport("Booting ISO\n");
 
-        prepare_game_lowmem(boot_path);
-        char *game_code = lowmem->b_disk_info.game_code;
-        bool is_tonyhawk_proskater4 = (game_code[0] == 'G' && game_code[1] == 'T' && game_code[2] == '4');
+        char *game_code = boot_entry.extra.game_id;
         bool is_xeno_crisis = (game_code[0] == 'G' && game_code[1] == 'C' && game_code[2] == 'R');
-        bool use_swiss = (is_tonyhawk_proskater4 || force_swiss_boot) && !is_xeno_crisis;
+        bool use_swiss_patches = force_swiss_boot;
 
-        if (use_swiss) {
-            custom_OSReport("Booting ISO (swiss chainload)\n");
-
-            dol_info_t info = load_dol("/swiss-gc.dol", true);
-
-            char *argz = (void*)info.max_addr + 32;
-            int argz_len = 0;
-
-            char autoload_arg[256];
-            strcpy(autoload_arg, "Autoload=fldrv:");
-            strcat(autoload_arg, boot_path);
-
-            const char *arg_list[] = {
-                "swiss-novideo.dol", // this causes Swiss to black the screen
-                autoload_arg,
-                "AutoBoot=Yes",
-                "IGRType=Reboot",
-                "BS2Boot=No",
-                "Prefer Clean Boot=No",
-                NULL
-            };
-
-            int arg_count = 0;
-            while(arg_list[arg_count] != NULL) {
-                const char *arg = arg_list[arg_count];
-                int arg_len = strlen(arg) + 1;
-                memcpy(argz + argz_len, arg, arg_len);
-                argz_len += arg_len;
-                arg_count++;
-            }
-
-            struct __argv *args = (void*)(info.entrypoint + 8);
-            args->argvMagic = ARGV_MAGIC;
-            args->commandLine = argz;
-            args->length = argz_len;
-
-            DCFlushRange(argz, argz_len);
-            DCFlushRange(args, sizeof(struct __argv));
-
-            run(info.entrypoint);
-        } else {
+        if (force_legacy_boot || is_xeno_crisis) {
             custom_OSReport("Booting ISO (custom apploader)\n");
-            chainload_boot_game(&boot_entry, false);
+            legacy_chainload_boot_game(&boot_entry, false);
+        } else {
+            custom_OSReport("Booting ISO (swiss chainload) [%s]\n", use_swiss_patches ? "PATCHED" : "CLEAN");
+            chainload_swiss_game(boot_path, false, use_swiss_patches);
         }
     }
 

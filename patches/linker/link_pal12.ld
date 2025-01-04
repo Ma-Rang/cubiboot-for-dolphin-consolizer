@@ -90,3 +90,12 @@ pal12_OSWakeupThread = 0x81366564;
 
 pal12_GXSetCurrentMtx = 0x8137bb34;
 pal12_ARQPostRequest = 0x813756e0;
+
+pal12_CARDProbe = 0x8135e3bc;
+pal12_EXILock = 0x81368300;
+pal12_EXIUnlock = 0x813683f4;
+pal12_EXISelect = 0x81367b40;
+pal12_EXIDeselect = 0x81367c6c;
+pal12_EXISync = 0x81367428;
+pal12_EXIImm = 0x81367040;
+pal12_EXIImmEx = 0x8136729c;

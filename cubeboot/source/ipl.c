@@ -135,26 +135,7 @@ void load_ipl(bool is_running_dolphin) {
     // TEST ONLY
     valid = false;
 #endif
-
     if (!valid) {
-        // #include "fatfs/ff.h"
-
-        // DIR dir;
-        // FRESULT lastRet = f_opendir(&dir, "/bios-sfn");
-        // if (lastRet != FR_OK)
-        // {
-        //     prog_halt("badA");
-        // }
-
-        // int count = 0;
-        // FILINFO fno;
-        // while ((lastRet = f_readdir(&dir, &fno)) == FR_OK && count < 10) {
-        //     iprintf("Found %s\n", fno.fname);
-        //     count++;
-        // }
-
-        // f_closedir(&dir);
-
         int size = get_file_size(bios_path);
         if (size == SD_FAIL) {
             char err_buf[255];

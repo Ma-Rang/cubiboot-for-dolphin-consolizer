@@ -11,6 +11,8 @@
 `patches/source/asm.h`: credit to swiss-gc <br/>
 `patches/source/os.c`: credit to swiss-gc <br/>
 `patches/source/usbgecko.c`: credit to swiss-gc <br/>
+`patches/source/mcp.c`: credit to swiss-gc <br/>
+`patches/source/mcp.h`: credit to swiss-gc <br/>
 `patches/source/gc_dvd.c` credit to wii64 <br/>
 `patches/source/gc_dvd.h` credit to wii64 <br/>
 `patches/source/picolibc`: credit to picolibc and newlib <br/>

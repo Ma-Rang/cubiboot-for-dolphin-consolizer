@@ -4,7 +4,7 @@
 // #define TEST_SKIP_ANIMATION
 // #define DOLPHIN_DELAY_ENABLE
 
-#define CONFIG_BETA_RC "08"
+#define CONFIG_BETA_RC "09"
 
 // #define USE_FAT_LIBFAT
 // #define USE_FAT_FATFS

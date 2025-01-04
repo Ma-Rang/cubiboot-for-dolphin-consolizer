@@ -17,13 +17,13 @@ char *buttons_names[] = {
     "right", // RIGHT	0x0002
     "down",  // DOWN	0x0004
     "up",    // UP		0x0008
-    "_",     // Z		0x0010 (NOT ALLOWED)
-    "r",     // R		0x0020
-    "l",     // L		0x0040
-    "_",     // origin  0x0080 (NOT USED)
-    "_",     // A		0x0100 (NOT ALLOWED)
+    "_",     // Z		0x0010 (NOT ALLOWED) used to switch sound
+    "_",     // R		0x0020 (NOT ALLOWED) used by bootloader
+    "_",     // L		0x0040 (NOT ALLOWED) used by bootloader
+    "_",     // origin  0x0080 (NOT ALLOWED) used by pad library
+    "_",     // A		0x0100 (NOT ALLOWED) used to force menu
     "b",     // B		0x0200
-    "_",     // X		0x0400 (NOT ALLOWED)
+    "_",     // X		0x0400 (NOT ALLOWED) used by bootloader
     "y",     // Y		0x0800
     "start", // START	0x1000
 };
@@ -111,6 +111,33 @@ void load_settings() {
     } else {
         iprintf("Found postboot_delay_ms = %u\n", postboot_delay_ms);
         settings.postboot_delay_ms = postboot_delay_ms;
+    }
+
+    // force_legacy_boot
+    int force_legacy_boot = 0;
+    if (!ini_sget(conf, "cubeboot", "force_legacy_boot", "%d", &force_legacy_boot)) {
+        settings.force_legacy_boot = 0;
+    } else {
+        iprintf("Found force_legacy_boot = %d\n", force_legacy_boot);
+        settings.force_legacy_boot = force_legacy_boot;
+    }
+
+    // show_watermark
+    int show_watermark = 0;
+    if (!ini_sget(conf, "cubeboot", "show_watermark", "%d", &show_watermark)) {
+        settings.show_watermark = 0;
+    } else {
+        iprintf("Found show_watermark = %d\n", show_watermark);
+        settings.show_watermark = show_watermark;
+    }
+
+    // disable_mcp_select
+    int disable_mcp_select = 0;
+    if (!ini_sget(conf, "cubeboot", "disable_mcp_select", "%d", &disable_mcp_select)) {
+        settings.disable_mcp_select = 0;
+    } else {
+        iprintf("Found disable_mcp_select = %d\n", disable_mcp_select);
+        settings.disable_mcp_select = disable_mcp_select;
     }
 
     // button presses

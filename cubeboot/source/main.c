@@ -35,7 +35,6 @@
 #include "pngu/pngu.h"
 
 #include "config.h"
-#include "loader.h"
 #include "gcm.h"
 #include "bnr.h"
 
@@ -183,25 +182,9 @@ int main(int argc, char **argv) {
 
     iprintf("force_passthrough = %d\n", force_passthrough);
 
-#if 0
-    // setup config device
-    if (mount_available_device() != SD_OK) {
-        iprintf("Could not find an inserted SD card\n");
-    }
-
-    if (is_device_mounted()) {
-        load_settings();
-    }
-
-    // check if we have a bootable dol
-    if (check_load_program()) {
-        can_load_dol = true;
-    }
-#else
     // setup settings
     iprintf("Loading settings\n");
     load_settings();
-#endif
 
 //// fun stuff
 
@@ -354,6 +337,10 @@ int main(int argc, char **argv) {
     // set_patch_value(symshdr, syment, symstringdata, "cube_text_tex", (u32)image_data);
     set_patch_value(symshdr, syment, symstringdata, "force_progressive", settings.progressive_enabled);
     set_patch_value(symshdr, syment, symstringdata, "force_swiss_boot", settings.force_swiss_default);
+
+    set_patch_value(symshdr, syment, symstringdata, "force_legacy_boot", settings.force_legacy_boot);
+    set_patch_value(symshdr, syment, symstringdata, "disable_mcp_select", settings.disable_mcp_select);
+    set_patch_value(symshdr, syment, symstringdata, "show_watermark", settings.show_watermark);
 
     set_patch_value(symshdr, syment, symstringdata, "preboot_delay_ms", settings.preboot_delay_ms);
     set_patch_value(symshdr, syment, symstringdata, "postboot_delay_ms", settings.postboot_delay_ms);

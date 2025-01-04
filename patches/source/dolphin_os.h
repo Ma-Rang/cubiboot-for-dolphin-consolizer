@@ -3,7 +3,7 @@
 #include <gctypes.h>
 #include "config.h"
 
-#include "../../cubeboot/include/gcm.h"
+#include "gcm.h"
 
 #define DEFAULT_THREAD_PRIO 0x10
 
@@ -179,6 +179,6 @@ BOOL OSTryLockMutex(OSMutex* mutex);
 // void OSWaitCond(OSCond* cond, OSMutex* mutex);
 // void OSSignalCond(OSCond* cond);
 
-// void OSInitMessageQueue(OSMessageQueue* mq, OSMessage* msgArray, s32 msgCount);
-// BOOL OSSendMessage(OSMessageQueue* mq, OSMessage msg, s32 flags);
-// BOOL OSReceiveMessage(OSMessageQueue* mq, OSMessage* msg, s32 flags);
+void OSInitMessageQueue(OSMessageQueue* mq, OSMessage* msgArray, s32 msgCount);
+BOOL OSSendMessage(OSMessageQueue* mq, OSMessage msg, s32 flags);
+BOOL OSReceiveMessage(OSMessageQueue* mq, OSMessage* msg, s32 flags);

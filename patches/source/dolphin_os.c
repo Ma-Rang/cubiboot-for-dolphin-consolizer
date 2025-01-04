@@ -270,63 +270,63 @@ BOOL OSTryLockMutex(OSMutex* mutex) {
 //     OSWakeupThread(&cond->queue);
 // }
 
-// // from https://github.com/zeldaret/tp/blob/a61e3491f7c46b698514af50464cf71ba76bd3a3/libs/dolphin/os/OSMessage.c
-// void OSInitMessageQueue(OSMessageQueue* mq, OSMessage* msgArray, s32 msgCount) {
-//     OSInitThreadQueue(&mq->sending_queue);
-//     OSInitThreadQueue(&mq->receiving_queue);
-//     mq->message_array = msgArray;
-//     mq->num_messages = msgCount;
-//     mq->first_index = 0;
-//     mq->num_used = 0;
-// }
+// from https://github.com/zeldaret/tp/blob/a61e3491f7c46b698514af50464cf71ba76bd3a3/libs/dolphin/os/OSMessage.c
+void OSInitMessageQueue(OSMessageQueue* mq, OSMessage* msgArray, s32 msgCount) {
+    OSInitThreadQueue(&mq->sending_queue);
+    OSInitThreadQueue(&mq->receiving_queue);
+    mq->message_array = msgArray;
+    mq->num_messages = msgCount;
+    mq->first_index = 0;
+    mq->num_used = 0;
+}
 
-// BOOL OSSendMessage(OSMessageQueue* mq, OSMessage msg, s32 flags) {
-//     BOOL enabled;
-//     s32 lastIndex;
+BOOL OSSendMessage(OSMessageQueue* mq, OSMessage msg, s32 flags) {
+    BOOL enabled;
+    s32 lastIndex;
 
-//     enabled = OSDisableInterrupts();
+    enabled = OSDisableInterrupts();
 
-//     while (mq->num_messages <= mq->num_used) {
-//         if (!(flags & OS_MESSAGE_BLOCK)) {
-//             OSRestoreInterrupts(enabled);
-//             return FALSE;
-//         } else {
-//             OSSleepThread(&mq->sending_queue);
-//         }
-//     }
+    while (mq->num_messages <= mq->num_used) {
+        if (!(flags & OS_MESSAGE_BLOCK)) {
+            OSRestoreInterrupts(enabled);
+            return FALSE;
+        } else {
+            OSSleepThread(&mq->sending_queue);
+        }
+    }
 
-//     lastIndex = (mq->first_index + mq->num_used) % mq->num_messages;
-//     mq->message_array[lastIndex] = msg;
-//     mq->num_used++;
+    lastIndex = (mq->first_index + mq->num_used) % mq->num_messages;
+    mq->message_array[lastIndex] = msg;
+    mq->num_used++;
 
-//     OSWakeupThread(&mq->receiving_queue);
+    OSWakeupThread(&mq->receiving_queue);
 
-//     OSRestoreInterrupts(enabled);
-//     return TRUE;
-// }
+    OSRestoreInterrupts(enabled);
+    return TRUE;
+}
 
-// BOOL OSReceiveMessage(OSMessageQueue* mq, OSMessage* msg, s32 flags) {
-//     BOOL enabled;
+BOOL OSReceiveMessage(OSMessageQueue* mq, OSMessage* msg, s32 flags) {
+    BOOL enabled;
 
-//     enabled = OSDisableInterrupts();
+    enabled = OSDisableInterrupts();
 
-//     while (mq->num_used == 0) {
-//         if (!(flags & OS_MESSAGE_BLOCK)) {
-//             OSRestoreInterrupts(enabled);
-//             return FALSE;
-//         } else {
-//             OSSleepThread(&mq->receiving_queue);
-//         }
-//     }
+    while (mq->num_used == 0) {
+        if (!(flags & OS_MESSAGE_BLOCK)) {
+            OSRestoreInterrupts(enabled);
+            return FALSE;
+        } else {
+            OSSleepThread(&mq->receiving_queue);
+        }
+    }
 
-//     if (msg != NULL) {
-//         *msg = mq->message_array[mq->first_index];
-//     }
-//     mq->first_index = (mq->first_index + 1) % mq->num_messages;
-//     mq->num_used--;
+    if (msg != NULL) {
+        *msg = mq->message_array[mq->first_index];
+    }
+    mq->first_index = (mq->first_index + 1) % mq->num_messages;
+    mq->num_used--;
 
-//     OSWakeupThread(&mq->sending_queue);
+    OSWakeupThread(&mq->sending_queue);
 
-//     OSRestoreInterrupts(enabled);
-//     return TRUE;
-// }
+    OSRestoreInterrupts(enabled);
+    return TRUE;
+}

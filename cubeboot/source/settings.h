@@ -6,6 +6,9 @@ typedef struct settings {
     u32 cube_color;
     char *cube_logo;
     u32 force_swiss_default;
+    u32 force_legacy_boot;
+    u32 show_watermark;
+    u32 disable_mcp_select;
     u32 progressive_enabled;
     u32 preboot_delay_ms;
     u32 postboot_delay_ms;
