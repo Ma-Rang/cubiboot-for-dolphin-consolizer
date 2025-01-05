@@ -69,12 +69,27 @@ patch_inst_pal "_gameselect_replace_input" 0x81327968 0x81326ec0 0x81327aa8 bl h
     addi r3, r1, 0x74
     addi r4, r1, 0x14
     bl set_gameselect_view
-    rept_inst 44 nop
+    repeat_inst 44 nop
 .endm
 
 // NOTE: this is a mid-finction patch
 patch_inst_ntsc "_gameselect_draw_helper" 0x81326c14 0x81327430 0x813277c8 0x813277e0 routine_gameselect_matrix_helper
 patch_inst_pal "_gameselect_draw_helper" 0x81327e04 0x8132735c 0x81327f44 routine_gameselect_matrix_helper
+
+.macro routine_load_r0_r3_val1
+    li r0, 1
+    li r3, 1
+.endm
+
+// This makes the compare succeed
+patch_inst_ntsc "_force_valid_encoding" 0x81345130 0x8136cdd4 0x8135a3e8 0x8135a3e8 routine_load_r0_r3_val1
+patch_inst_pal "_force_valid_encoding" 0x813703b4 0x8136ccf4 0x8135d768 routine_load_r0_r3_val1
+
+patch_inst_ntsc "_ignore_boot_error_setup" 0x8130bad8 0x8130bcd8 0x8130c04c 0x8130c064 li r0, 0x3
+patch_inst_pal "_ignore_boot_error_setup" 0x8130bf30 0x8130bc04 0x8130c070 li r0, 0x3
+
+patch_inst_ntsc "_ignore_boot_error_rtc" 0x8130bac0 0x8130bcc0 0x8130c034 0x8130c04c li r0, 0x3
+patch_inst_pal "_ignore_boot_error_rtc" 0x8130bf18 0x8130bbec 0x8130c058 li r0, 0x3
 
 patch_inst_ntsc "_stub_dvdwait" 0x00000000 0x8130108c 0x81301440 0x81301444 nop
 patch_inst_pal  "_stub_dvdwait" 0x8130108c 0x8130108c 0x813011f8 nop

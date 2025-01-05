@@ -34,7 +34,7 @@
 .set vPAL_12(_SDA_BASE_), 0x814b7280
 
 // helpers
-.macro rept_inst count, inst:vararg
+.macro repeat_inst count, inst:vararg
 .rept \count
     \inst
 .endr
