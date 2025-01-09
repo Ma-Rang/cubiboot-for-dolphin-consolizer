@@ -39,6 +39,7 @@
 #include "bnr.h"
 
 #include "flippy_sync.h"
+#include "sram.h"
 
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 
@@ -185,6 +186,10 @@ int main(int argc, char **argv) {
     // setup settings
     iprintf("Loading settings\n");
     load_settings();
+
+    // fix sram
+    set_sram_swiss(true);
+    create_swiss_config();
 
 //// fun stuff
 

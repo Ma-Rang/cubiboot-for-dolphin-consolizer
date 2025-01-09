@@ -13,11 +13,13 @@
 #include "print.h"
 #include "halt.h"
 
+#include "tinf_crc32.h"
 #include "descrambler.h"
 #include "crc32.h"
 #include "ipl.h"
 
 #include "flippy_sync.h"
+#include "boot/ssaram.h"
 
 extern GXRModeObj *rmode;
 extern void *xfb;
@@ -65,13 +67,13 @@ char *bios_path = "/ipl.bin";
 // NOTE: these are not ipl.bin CRCs, but decoded ipl[0x100:] hashes
 // FIXME: this is over-reading by a lot (not fixed to code size)
 bios_item bios_table[] = {
-    {IPL_NTSC_10,      IPL_NTSC,  "gc-ntsc-10",      "ntsc10",       "VER_NTSC_10",      CRC(0xa8325e47), SDA(0x81465320)},
-    {IPL_NTSC_11,      IPL_NTSC,  "gc-ntsc-11",      "ntsc11",       "VER_NTSC_11",      CRC(0xf1ebeb95), SDA(0x81489120)},
-    {IPL_NTSC_12_001,  IPL_NTSC,  "gc-ntsc-12_001",  "ntsc12_001",   "VER_NTSC_12_001",  CRC(0xc4c5a12a), SDA(0x8148b1c0)},
-    {IPL_NTSC_12_101,  IPL_NTSC,  "gc-ntsc-12_101",  "ntsc12_101",   "VER_NTSC_12_101",  CRC(0xbf225e4d), SDA(0x8148b640)},
-    {IPL_PAL_10,       IPL_PAL,   "gc-pal-10",       "pal10",        "VER_PAL_10",       CRC(0x5c3445d0), SDA(0x814b4fc0)},
-    {IPL_PAL_11,       IPL_PAL,   "gc-pal-11",       "pal11",        "VER_PAL_11",       CRC(0x05196b74), SDA(0x81483de0)}, // MPAL
-    {IPL_PAL_12,       IPL_PAL,   "gc-pal-12",       "pal12",        "VER_PAL_12",       CRC(0x1082fbc9), SDA(0x814b7280)},
+    {IPL_NTSC_10,      IPL_NTSC,  "gc-ntsc-10",      "ntsc10",       "VER_NTSC_10",      CRC(0x2487919c), SDA(0x81465320)},
+    {IPL_NTSC_11,      IPL_NTSC,  "gc-ntsc-11",      "ntsc11",       "VER_NTSC_11",      CRC(0x53faeffc), SDA(0x81489120)},
+    {IPL_NTSC_12_001,  IPL_NTSC,  "gc-ntsc-12_001",  "ntsc12_001",   "VER_NTSC_12_001",  CRC(0xdc527533), SDA(0x8148b1c0)},
+    {IPL_NTSC_12_101,  IPL_NTSC,  "gc-ntsc-12_101",  "ntsc12_101",   "VER_NTSC_12_101",  CRC(0x84075b6d), SDA(0x8148b640)},
+    {IPL_PAL_10,       IPL_PAL,   "gc-pal-10",       "pal10",        "VER_PAL_10",       CRC(0xeadf6ce5), SDA(0x814b4fc0)},
+    {IPL_PAL_11,       IPL_PAL,   "gc-pal-11",       "pal11",        "VER_PAL_11",       CRC(0x76b301de), SDA(0x81483de0)}, // MPAL
+    {IPL_PAL_12,       IPL_PAL,   "gc-pal-12",       "pal12",        "VER_PAL_12",       CRC(0x89f5a81a), SDA(0x814b7280)},
 };
 
 extern void __SYS_ReadROM(void *buf,u32 len,u32 offset);
@@ -81,7 +83,27 @@ extern u32 diff_msec(s64 start,s64 end);
 
 static bool valid = false;
 
+typedef struct {
+    u16 magic;
+    u8 revision;
+    u8 padding;
+    u32 blob_checksum;
+    u32 code_size;
+    u32 code_checksum;
+} ipl_metadata_t;
+
 void load_ipl(bool is_running_dolphin) {
+    ARAMFetch((void*)BS2_BASE_ADDR, (void*)0xe00000, 0x200000);
+    ipl_metadata_t *blob_metadata = (void*)0x81500000 - sizeof(ipl_metadata_t);
+
+    ipl_metadata_t metadata = {};
+    memcpy(&metadata, blob_metadata, sizeof(ipl_metadata_t));
+    memset(blob_metadata, 0, sizeof(ipl_metadata_t));
+
+    if (metadata.magic != 0xC0DE) {
+        prog_halt("Invalid IPL metadata\n");
+    }
+#if 0
     if (is_running_dolphin) {
         __SYS_ReadROM(bs2, bs2_size, BS2_CODE_OFFSET); // IPL is not encrypted on Dolphin
         iprintf("TEST IPL D, %08x\n", *(u32*)bs2);
@@ -114,7 +136,12 @@ void load_ipl(bool is_running_dolphin) {
     iprintf("TEST IPL D, %08x\n", *(u32*)bs2);
 #endif
 
+
     u32 crc = csp_crc32_memory(bs2, bs2_size);
+    iprintf("Read BS2 crc=%08x\n", crc);
+#endif
+
+    u32 crc = tinf_crc32((void*)BS2_BASE_ADDR, metadata.code_size);
     iprintf("Read BS2 crc=%08x\n", crc);
 
     u32 sda = get_sda_address();

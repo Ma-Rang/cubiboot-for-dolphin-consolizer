@@ -84,12 +84,15 @@ void _main() {
 	for (int i = 0; i < MAXDATASECTION; i++) {
 		if (hdr->dataAddress[i] && hdr->dataLength[i]) {
 			_memcpy((void*)hdr->dataAddress[i], ((unsigned char*)dol_buf) + hdr->dataOffset[i], hdr->dataLength[i]);
-			// u32 _max = hdr->dataAddress[i] + hdr->dataLength[i];
-			// if (_max > max) max = _max;
+			u32 _max = hdr->dataAddress[i] + hdr->dataLength[i];
+			if (_max > max) max = _max;
 		}
 	}
 	
 	gprintf("ddd %08x\n", max);
+
+	u32 code_length = max - hdr->entryPoint;
+	gprintf("DDD %08x %08x %08x\n", hdr->entryPoint, max, code_length);
 
 	// Clear BSS
 	_memset((void*)hdr->bssAddress, 0, hdr->bssLength);
@@ -99,8 +102,8 @@ void _main() {
 	void (*entrypoint)();
 	entrypoint = (void(*)())hdr->entryPoint;
 
-	DCFlushRangeNoSync((void*)hdr->entryPoint, max);
-	ICInvalidateRange((void*)hdr->entryPoint, max);
+	DCFlushRangeNoSync((void*)hdr->entryPoint, code_length);
+	ICInvalidateRange((void*)hdr->entryPoint, code_length);
 	gprintf("boot\n");
 	entrypoint();
 	__builtin_unreachable();
