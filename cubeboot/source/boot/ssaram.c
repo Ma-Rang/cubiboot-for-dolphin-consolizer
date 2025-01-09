@@ -12,7 +12,6 @@
 
 static u8 aramfix[2048] ATTRIBUTE_ALIGN(32);
 
-#define ARAMSTART  0x8000
 #define ARAM_READ  1
 #define ARAM_WRITE 0
 
@@ -103,7 +102,6 @@ void ARAMClear(u32 start, u32 length)
   for (i = start; i < 0x1000000 - length; i += 2048)
   {
     ARAMPut(buffer, (char *) i, 2048);
-    while (AR_GetDMAStatus());
   }
 
   free(buffer);
@@ -156,7 +154,6 @@ void ARAMPut(unsigned char *src, char *dst, int len)
     memcpy(aramfix, src + offset, 2048);
     DCFlushRange(aramfix, 2048);
     __ARWriteDMA((u32) aramfix, (u32) dst + offset, 2048);
-    while (AR_GetDMAStatus());
     offset += 2048;
   }
 

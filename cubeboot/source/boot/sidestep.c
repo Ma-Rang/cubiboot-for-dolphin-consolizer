@@ -16,7 +16,7 @@
 #include "sidestep.h"
 #include "ssaram.h"
 
-#define ARAMSTART 0
+#define ARAMSTART 0x8000
 #define ARAMSIZE (10 * 1024 * 1024)
 
 /*** A global or two ***/
