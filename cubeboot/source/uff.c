@@ -138,7 +138,7 @@ FRESULT uf_open(const char* path) {
     }
 
     __file_offset = 0;
-    int ret = dvd_custom_open((char*)path, FILE_TYPE_FLAG_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
+    int ret = dvd_custom_open((char*)path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLEFASTSEEK);
     iprintf("dvd_custom_open ret: %08x\n", ret);
     if (ret != 0) return FR_NOT_OPENED;
 

@@ -114,31 +114,32 @@ enum {
 };
 
 enum {
-    FILE_TYPE_FLAG_FILE   = 0x00,
-    FILE_TYPE_FLAG_RDO    = 0x01, // AM_RDO
-    FILE_TYPE_FLAG_HIDDEN = 0x02, // AM_HID
-    FILE_TYPE_FLAG_SYSTEM = 0x04, // AM_SYS
-    FILE_TYPE_FLAG_DIR    = 0x10, // AM_DIR
-    FILE_TYPE_FLAG_ARC    = 0x20, // AM_ARC
+    FILE_ENTRY_TYPE_FILE = 0,
+    FILE_ENTRY_TYPE_DIR = 1,
+
+    FILE_ENTRY_TYPE_BAD = 0xFF,
+    FILE_ENTRY_TYPE_MAX = 0xFF
 };
 
 enum {
-    INTERNAL_FD_TYPE_FILE = 0,
-    INTERNAL_FD_TYPE_DIR  = 1,
-
-    INTERNAL_FD_TYPE_BAD = 0xFF,
-    INTERNAL_FD_TYPE_MAX = 0xFF
+    FILE_ATTRIB_FLAG_FILE   = 0x00,
+    FILE_ATTRIB_FLAG_RDO    = 0x01, // AM_RDO
+    FILE_ATTRIB_FLAG_HIDDEN = 0x02, // AM_HID
+    FILE_ATTRIB_FLAG_SYSTEM = 0x04, // AM_SYS
+    FILE_ATTRIB_FLAG_DIR    = 0x10, // AM_DIR
+    FILE_ATTRIB_FLAG_ARC    = 0x20, // AM_ARC
 };
 
 typedef struct {
     char name[MAX_FILE_NAME];
-    uint8_t types;
+    uint8_t type;
     uint8_t flags;
     uint64_t size;
     uint32_t date;
     uint32_t time;
     uint32_t last_status;
-    uint8_t pad[10];
+    uint8_t attrib;
+    uint8_t pad[9];
 } file_entry_t;
 
 ASSERT_SIZE_MULTIPLE_OF_32(file_entry_t);

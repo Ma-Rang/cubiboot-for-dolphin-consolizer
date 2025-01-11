@@ -33,7 +33,7 @@ void create_swiss_config() {
     dvd_custom_mkdir("/swiss/settings");
 
     // check swiss global config
-    dvd_custom_open(SWISS_GLOBAL_CONFIG_PATH, FILE_TYPE_FLAG_FILE, IPC_FILE_FLAG_DISABLESPEEDEMU);
+    dvd_custom_open(SWISS_GLOBAL_CONFIG_PATH, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLESPEEDEMU);
 
 	GCN_ALIGNED(file_status_t) status;
 	int ret = dvd_custom_status(&status);
@@ -46,7 +46,7 @@ void create_swiss_config() {
     }
 
     // create swiss global config
-    ret = dvd_custom_open(SWISS_GLOBAL_CONFIG_PATH, FILE_TYPE_FLAG_FILE, IPC_FILE_FLAG_DISABLESPEEDEMU | IPC_FILE_FLAG_WRITE);
+    ret = dvd_custom_open(SWISS_GLOBAL_CONFIG_PATH, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLESPEEDEMU | IPC_FILE_FLAG_WRITE);
     if (ret != 0) return;
 
     // TODO: what do we put in this file?

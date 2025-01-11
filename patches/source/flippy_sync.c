@@ -265,7 +265,7 @@ int dvd_custom_open(const char *path, uint8_t type, uint8_t flags) {
 
     strncpy(entry.name, path, 256);
     entry.name[255] = 0;
-    entry.types = type;
+    entry.type = type;
     entry.flags = flags;
 
     DCFlushRange(&entry, sizeof(file_entry_t));
@@ -296,7 +296,7 @@ int dvd_custom_open_flash(const char *path, uint8_t type, uint8_t flags) {
 
     strncpy(entry.name, path, 256);
     entry.name[255] = 0;
-    entry.types = type;
+    entry.type = type;
     entry.flags = flags;
 
     DCFlushRange(&entry, sizeof(file_entry_t));
