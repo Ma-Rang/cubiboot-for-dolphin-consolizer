@@ -74,7 +74,11 @@ typedef struct {
     u8 disc_ver;
     u8 padding;
     u8 dvd_bnr_type;
-	u32 dvd_bnr_offset;
+    u32 dvd_bnr_offset;
+    u32 dvd_dol_offset;
+    u32 dvd_fst_offset;
+    u32 dvd_fst_size;
+    u32 dvd_max_fst_size;
 } gm_extra_t;
 
 typedef struct {

@@ -16,6 +16,8 @@ MEMORY {
 EXI = 0xCC006800;
 DSP = 0xCC005000;
 
+dvd_read_data = dvd_read;
+
 /* used by OS */
 __OSCurrentThread = 0x800000E4;
 __OSActiveThreadQueue = 0x800000DC;

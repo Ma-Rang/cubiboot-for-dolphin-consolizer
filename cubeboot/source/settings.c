@@ -113,15 +113,6 @@ void load_settings() {
         settings.postboot_delay_ms = postboot_delay_ms;
     }
 
-    // force_legacy_boot
-    int force_legacy_boot = 1;
-    if (!ini_sget(conf, "cubeboot", "force_legacy_boot", "%d", &force_legacy_boot)) {
-        settings.force_legacy_boot = 1;
-    } else {
-        iprintf("Found force_legacy_boot = %d\n", force_legacy_boot);
-        settings.force_legacy_boot = force_legacy_boot;
-    }
-
     // show_watermark
     int show_watermark = 0;
     if (!ini_sget(conf, "cubeboot", "show_watermark", "%d", &show_watermark)) {

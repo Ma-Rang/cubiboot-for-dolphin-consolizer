@@ -32,6 +32,7 @@ typedef struct __attribute__((__packed__)) {
 
 // oem
 dvd_info_t *dvd_inquiry();
+void dvd_audio_config(char use_streaming, char size);
 
 // bootloader
 int dvd_bootloader_status(firmware_status_blob_t*dst);
@@ -43,7 +44,8 @@ void dvd_bootloader_noupdate();
 void dvd_custom_close(uint32_t fd);
 void dvd_set_default_fd(uint32_t current_fd, uint32_t second_fd);
 int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd);
-int dvd_read(void *dst, unsigned int len, uint64_t offset, uint32_t fd);
+int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd);
+int dvd_read_data(void* dst, unsigned int len, uint64_t offset, unsigned int fd);
 file_status_t *dvd_custom_status();
 int dvd_custom_status_flash(file_status_t *dst);
 int dvd_custom_readdir(file_entry_t *dst, uint32_t fd);

@@ -351,7 +351,6 @@ int main(int argc, char **argv) {
     set_patch_value(symshdr, syment, symstringdata, "force_progressive", settings.progressive_enabled);
     set_patch_value(symshdr, syment, symstringdata, "force_swiss_boot", settings.force_swiss_default);
 
-    set_patch_value(symshdr, syment, symstringdata, "force_legacy_boot", settings.force_legacy_boot);
     set_patch_value(symshdr, syment, symstringdata, "disable_mcp_select", settings.disable_mcp_select);
     set_patch_value(symshdr, syment, symstringdata, "show_watermark", settings.show_watermark);
 
@@ -380,11 +379,6 @@ int main(int argc, char **argv) {
 
     /*** Shutdown all threads and exit to this method ***/
     iprintf("IPL BOOTING\n");
-
-#ifdef DOLPHIN_DELAY_ENABLE
-    // fix for dolphin cache
-    udelay(3 * 1000 * 1000);
-#endif
 
     iprintf("DONE\n");
 

@@ -710,6 +710,10 @@ void gm_check_files(int path_count) {
             backing->extra.disc_ver = info.disc_ver;
             backing->extra.dvd_bnr_offset = info.bnr_offset;
             backing->extra.dvd_bnr_type = info.bnr_type;
+            backing->extra.dvd_dol_offset = info.dol_offset;
+            backing->extra.dvd_fst_offset = info.fst_offset;
+            backing->extra.dvd_fst_size = info.fst_size;
+            backing->extra.dvd_max_fst_size = info.max_fst_size;
 
             // load the banner
             bool bnr_loaded = gm_load_banner(backing, aram_offset, force_unload);

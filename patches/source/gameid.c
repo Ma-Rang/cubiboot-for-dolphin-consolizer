@@ -19,7 +19,7 @@ void mcp_set_gameid(gm_file_entry_t *entry) {
     OSSendMessage(card_thread_mq, (OSMessage)0xc, 0);
 }
 
-static void setup_gameid_commands(struct gcm_disk_info *di, char diskName[64]) {
+void setup_gameid_commands(struct gcm_disk_info *di, char diskName[64]) {
     const s32 chan = 0;
     u32 id;
     s32 ret;

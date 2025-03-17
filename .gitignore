@@ -13,3 +13,4 @@ ipl.rom
 *.bin.scrambled
 
 patches/include/secret.h
+patches/tests

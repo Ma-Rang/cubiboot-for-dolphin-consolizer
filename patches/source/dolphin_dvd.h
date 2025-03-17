@@ -67,6 +67,21 @@ typedef struct {
 } DiskHeader __attribute__((aligned(32)));
 
 typedef struct {
+	u32 DebugMonSize;
+	u32 SimMemSize;
+	u32 ArgOffset;
+	u32 DebugFlag;
+	u32 TRKLocation;
+	u32 TRKSize;
+	u32 RegionCode;
+	u32 TotalDisc;
+	u32 LongFileName;
+	u32 PADSpec;
+	u32 DOLLimit;
+	// u8  unused_6[8148];
+} DiskHeaderInformation __attribute__((aligned(32)));
+
+typedef struct {
 	u32 DOLOffset;		//offset of main executable DOL (bootfile)
 	u32 FSTOffset;		//offset of the FST ("fst.bin")
 	u32	FSTSize;		//size of FST
@@ -99,9 +114,13 @@ typedef struct {
 	u8 disc_ver;
 	u8 bnr_type;
 	u32 bnr_offset;
+	u32 dol_offset;
+	u32 fst_offset;
+	u32 fst_size;
+	u32 max_fst_size;
 } dolphin_game_into_t;
 
-_Static_assert(sizeof(dolphin_game_into_t) == 16);
+_Static_assert(sizeof(dolphin_game_into_t) == 32);
 
 dolphin_game_into_t get_game_info(char *game_path);
 

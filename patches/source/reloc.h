@@ -1,6 +1,8 @@
 #include "structs.h"
 #include "config.h"
 
+extern BOOL is_running_dolphin;
+
 #ifdef DEBUG
 extern void (*OSReport)(const char* text, ...);
 #else

@@ -56,7 +56,7 @@ static u32 bs2_size = IPL_SIZE - BS2_CODE_OFFSET;
 static u8 *bs2 = (u8*)(BS2_BASE_ADDR);
 
 s8 bios_index = -1;
-bios_item *current_bios;
+bios_item_t *current_bios;
 
 #ifdef TEST_IPL_PATH
 char *bios_path = TEST_IPL_PATH;
@@ -66,14 +66,14 @@ char *bios_path = "/ipl.bin";
 
 // NOTE: these are not ipl.bin CRCs, but decoded ipl[0x100:] hashes
 // FIXME: this is over-reading by a lot (not fixed to code size)
-bios_item bios_table[] = {
-    {IPL_NTSC_10,      IPL_NTSC,  "gc-ntsc-10",      "ntsc10",       "VER_NTSC_10",      CRC(0x2487919c), SDA(0x81465320)},
-    {IPL_NTSC_11,      IPL_NTSC,  "gc-ntsc-11",      "ntsc11",       "VER_NTSC_11",      CRC(0x53faeffc), SDA(0x81489120)},
-    {IPL_NTSC_12_001,  IPL_NTSC,  "gc-ntsc-12_001",  "ntsc12_001",   "VER_NTSC_12_001",  CRC(0xdc527533), SDA(0x8148b1c0)},
-    {IPL_NTSC_12_101,  IPL_NTSC,  "gc-ntsc-12_101",  "ntsc12_101",   "VER_NTSC_12_101",  CRC(0x84075b6d), SDA(0x8148b640)},
-    {IPL_PAL_10,       IPL_PAL,   "gc-pal-10",       "pal10",        "VER_PAL_10",       CRC(0xeadf6ce5), SDA(0x814b4fc0)},
-    {IPL_PAL_11,       IPL_PAL,   "gc-pal-11",       "pal11",        "VER_PAL_11",       CRC(0x76b301de), SDA(0x81483de0)}, // MPAL
-    {IPL_PAL_12,       IPL_PAL,   "gc-pal-12",       "pal12",        "VER_PAL_12",       CRC(0x89f5a81a), SDA(0x814b7280)},
+bios_item_t bios_table[] = {
+    {IPL_NTSC_10,      IPL_NTSC,  "gc-ntsc-10",      "ntsc10",       "VER_NTSC_10",      CLEANCRC(0xbb05745c), DIRTYCRC(0x2487919c), SDA(0x81465320)},
+    {IPL_NTSC_11,      IPL_NTSC,  "gc-ntsc-11",      "ntsc11",       "VER_NTSC_11",      CLEANCRC(0x6cd1acb5), DIRTYCRC(0x53faeffc), SDA(0x81489120)},
+    {IPL_NTSC_12_001,  IPL_NTSC,  "gc-ntsc-12_001",  "ntsc12_001",   "VER_NTSC_12_001",  CLEANCRC(0xedf79188), DIRTYCRC(0xdc527533), SDA(0x8148b1c0)},
+    {IPL_NTSC_12_101,  IPL_NTSC,  "gc-ntsc-12_101",  "ntsc12_101",   "VER_NTSC_12_101",  CLEANCRC(0x65434097), DIRTYCRC(0x84075b6d), SDA(0x8148b640)},
+    {IPL_PAL_10,       IPL_PAL,   "gc-pal-10",       "pal10",        "VER_PAL_10",       CLEANCRC(0x9391a4d2), DIRTYCRC(0xeadf6ce5), SDA(0x814b4fc0)},
+    {IPL_PAL_11,       IPL_PAL,   "gc-pal-11",       "pal11",        "VER_PAL_11",       CLEANCRC(0x3e9af028), DIRTYCRC(0x76b301de), SDA(0x81483de0)}, // MPAL
+    {IPL_PAL_12,       IPL_PAL,   "gc-pal-12",       "pal12",        "VER_PAL_12",       CLEANCRC(0xa53af44f), DIRTYCRC(0x89f5a81a), SDA(0x814b7280)},
 };
 
 extern void __SYS_ReadROM(void *buf,u32 len,u32 offset);
@@ -106,10 +106,17 @@ void load_ipl(bool is_running_dolphin) {
     iprintf("\tCode size: %x\n", metadata.code_size);
     iprintf("\tCode checksum: %x\n", metadata.code_checksum);
 
+#ifndef FORCE_IPL_LOAD
     if (metadata.magic != 0xC0DE) {
-        iprintf("Invalid IPL metadata\n"); // do not halt
-        exit(0); // call stub
+        iprintf("Invalid IPL metadata\n"); // do not halt, we can recover
+        if (is_running_dolphin) {
+            prog_halt("Invalid IPL metadata\n");
+        } else {
+            exit(0); // call stub
+        }
     }
+#endif
+
 #if 0
     if (is_running_dolphin) {
         __SYS_ReadROM(bs2, bs2_size, BS2_CODE_OFFSET); // IPL is not encrypted on Dolphin
@@ -148,15 +155,15 @@ void load_ipl(bool is_running_dolphin) {
     iprintf("Read BS2 crc=%08x\n", crc);
 #endif
 
-    u32 crc = tinf_crc32((void*)BS2_BASE_ADDR, metadata.code_size);
-    iprintf("Read BS2 crc=%08x\n", crc);
-
     u32 sda = get_sda_address();
     iprintf("Read BS2 sda=%08x\n", sda);
 
+    u32 crc = tinf_crc32((void*)BS2_BASE_ADDR, metadata.code_size);
+    iprintf("Read BS2 crc=%08x\n", crc);
+
     valid = false;
     for(int i = 0; i < sizeof(bios_table) / sizeof(bios_table[0]); i++) {
-        if(bios_table[i].crc == crc && bios_table[i].sda == sda) {
+        if(bios_table[i].dirty_crc == crc && bios_table[i].sda == sda) {
             bios_index = i;
             valid = true;
             break;
@@ -198,15 +205,22 @@ void load_ipl(bool is_running_dolphin) {
         goto ipl_loaded;
     }
 
-    crc = csp_crc32_memory(bs2, bs2_size);
-    iprintf("Read IPL crc=%08x\n", crc);
-
     sda = get_sda_address();
     iprintf("Read IPL sda=%08x\n", sda);
 
+    crc = csp_crc32_memory(bs2, bs2_size);
+    iprintf("Read IPL crc=%08x\n", crc);
+
+#ifdef FORCE_IPL_LOAD
+    // temp before adding back IPL files
+    for(int i = 0; i < sizeof(bios_table) / sizeof(bios_table[0]); i++) {
+        bios_table[i].dirty_crc = crc;
+    }
+#endif
+
     valid = false;
     for(int i = 0; i < sizeof(bios_table) / sizeof(bios_table[0]); i++) {
-        if(bios_table[i].crc == crc && bios_table[i].sda == sda) {
+        if(bios_table[i].dirty_crc == crc && bios_table[i].sda == sda) {
             bios_index = i;
             valid = true;
             break;

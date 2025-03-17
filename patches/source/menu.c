@@ -207,6 +207,28 @@ __attribute_used__ void custom_gameselect_init() {
     game_blob_a = *ptr_game_blob_a;
     game_blob_b = *ptr_game_blob_b;
 
+
+    // if (*banner_pointer) {
+    //     char *names[] = {"blue", "green", "yellow", "orange", "red", "purple"};
+    //     u32 colors[] = {SAVE_COLOR_BLUE, SAVE_COLOR_GREEN, SAVE_COLOR_YELLOW, SAVE_COLOR_ORANGE, SAVE_COLOR_RED, SAVE_COLOR_PURPLE};
+    //     for (int i = 0; i < countof(colors); i++) {
+    //         u32 color_num = colors[i];
+    //         u32 color_index = 1 << (10 + 3 + color_num);
+    //         GXColorS10 *color_bright = get_save_color(color_index, SAVE_ICON);
+    //         GXColorS10 *color_bright_seleted = get_save_color(color_index, SAVE_ICON_SEL);
+    //         GXColorS10 *color_dim = get_save_color(color_index, SAVE_EMPTY);
+    //         GXColorS10 *color_dim_selected = get_save_color(color_index, SAVE_EMPTY_SEL);
+    //         OSReport("color = %s\n", names[i]);
+
+    //         DUMP_COLOR(color_bright);
+    //         DUMP_COLOR(color_bright_seleted);
+    //         DUMP_COLOR(color_dim);
+    //         DUMP_COLOR(color_dim_selected);
+    //     }
+
+    //     while(1);
+    // }
+
     // colors
     u32 color_num = SAVE_COLOR_PURPLE; // TODO: make a setting for this
     u32 color_index = 1 << (10 + 3 + color_num);
@@ -868,7 +890,7 @@ __attribute_used__ s32 handle_gameselect_inputs() {
 
 __attribute_data__ u8 show_watermark = 1;
 void alpha_watermark(void) {
-    if (!show_watermark) return;
+    if (!show_watermark && !is_running_dolphin) return;
     prep_text_mode();
 
     GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};

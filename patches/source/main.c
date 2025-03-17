@@ -22,6 +22,7 @@
 #include "video.h"
 #include "dol.h"
 #include "boot.h"
+#include "gameid.h"
 
 #define CUBE_TEX_WIDTH 84
 #define CUBE_TEX_HEIGHT 84
@@ -42,10 +43,6 @@ __attribute_data__ u32 start_passthrough_game = 0;
 __attribute_data__ u8 *cube_text_tex = NULL;
 __attribute_data__ u32 force_progressive = 0;
 __attribute_data__ u32 force_swiss_boot = 0;
-__attribute_data__ u32 force_legacy_boot = 0;
-
-// __attribute_data__ static cubeboot_state local_state;
-// __attribute_data__ static cubeboot_state *global_state = (cubeboot_state*)0x81700000;
 
 // used if we are switching to 60Hz on a PAL IPL
 __attribute_data__ static int fix_pal_ntsc = 0;
@@ -176,8 +173,30 @@ __attribute_used__ void mod_cube_colors() {
         DCFlushRange(img_ptr, buffer_size);
     }
 
-    // copy over colors
+    // OSReport("Original Colors:\n");
+    // color_cube
+    // color_cube_low
+    // color_bg_inner
+    // color_bg_outer_0
+    // color_bg_outer_1
 
+    // DUMP_COLOR(cube_model->data->mat[0].tev_color[0]);
+    // DUMP_COLOR(cube_model->data->mat[0].tev_color[1]);
+    // DUMP_COLOR(logo_model->data->mat[0].tev_color[0]);
+    // DUMP_COLOR(logo_model->data->mat[0].tev_color[1]);
+    // DUMP_COLOR(logo_model->data->mat[1].tev_color[0]);
+    // DUMP_COLOR(logo_model->data->mat[1].tev_color[1]);
+    // DUMP_COLOR(logo_model->data->mat[2].tev_color[0]);
+    // DUMP_COLOR(logo_model->data->mat[2].tev_color[1]);
+    // DUMP_COLOR(bg_inner_model->data->mat[0].tev_color[0]);
+    // DUMP_COLOR(bg_inner_model->data->mat[1].tev_color[0]);
+    // DUMP_COLOR(bg_outer_model->data->mat[0].tev_color[0]);
+    // DUMP_COLOR(bg_outer_model->data->mat[1].tev_color[0]);
+
+    // while(1);
+
+
+    // copy over colors
     copy_color(target_color, &cube_state->color);
     copy_color10(target_color, &color_cube);
     copy_color10(target_low, &color_cube_low);
@@ -335,9 +354,6 @@ __attribute_used__ void pre_main() {
     //     cube_color = 0x4A412A; // or 0x0000FF
     // }
 
-    // OSReport("LOADCMD %x, %x, %x, %x\n", prog_entrypoint, prog_dst, prog_src, prog_len);
-    // memmove((void*)prog_dst, (void*)prog_src, prog_len);
-
     main();
 
     __builtin_unreachable();
@@ -351,7 +367,7 @@ __attribute_data__ int frame_count = 0;
 __attribute_used__ u32 bs2tick() {
     frame_count++;
     if (!completed_time && cube_state->cube_anim_done) {
-        OSReport("FINISHED (%d)\n", frame_count);
+        OSReport("FINISHED (%d frames)\n", frame_count);
         completed_time = gettime();
     }
 
@@ -382,12 +398,37 @@ __attribute_used__ u32 bs2tick() {
 
 __attribute_used__ void bs2start() {
     OSReport("DONE\n");
+
+    // read boot info into lowmem
+    struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
+
     if (!start_passthrough_game) {
         gm_deinit_thread();
-    }
+    } else {
+        dvd_custom_bypass_enter();
+        udelay(10 * 1000);
 
-    // memcpy(global_state, &local_state, sizeof(cubeboot_state));
-    // global_state->boot_code = 0xCAFEBEEF;
+        int ret = dvd_read_id();
+        int err = dvd_get_error();
+        if (ret != 0 || err != 0) {
+            custom_OSReport("Failed to read disc ID\n");
+            dvd_custom_bypass_exit();
+            udelay(10 * 1000);
+
+            load_stub(); // exit to loader again
+            u32 *sig = (u32*)0x80001804;
+            if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
+                static void (*reload)(void) = (void(*)(void))0x80001800;
+                run(reload);
+            }
+        }
+
+        custom_OSReport("Game ID: %c%c%c%c\n", lowmem->b_disk_info.game_code[0], lowmem->b_disk_info.game_code[1], lowmem->b_disk_info.game_code[2], lowmem->b_disk_info.game_code[3]);
+        dvd_audio_config(lowmem->b_disk_info.audio_streaming, lowmem->b_disk_info.stream_buffer_size);
+
+        char diskName[64] = "DISC GAME\0";
+        setup_gameid_commands(&lowmem->b_disk_info, diskName);
+    }
 
     // no IPL code should be running after this point
 
@@ -403,37 +444,9 @@ __attribute_used__ void bs2start() {
     DCFlushRange((void*)start_addr, len);
     ICInvalidateRange((void*)start_addr, len);
 
-    // read boot info into lowmem
-    struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
-    lowmem->a_boot_magic = 0x0D15EA5E;
-    lowmem->a_version = 0x00000001;
-    lowmem->b_physical_memory_size = 0x01800000;
-
     // Passthrough mode
     if (start_passthrough_game) {
-        if (force_legacy_boot) {
-            dvd_custom_bypass_enter();
-            udelay(10 * 1000);
-
-            int ret = dvd_read_id();
-            int err = dvd_get_error();
-            if (ret != 0 || err != 0) {
-                custom_OSReport("Failed to read disc ID\n");
-                dvd_custom_bypass_exit();
-                udelay(10 * 1000);
-
-                load_stub(); // exit to loader again
-                u32 *sig = (u32*)0x80001804;
-                if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
-                    static void (*reload)(void) = (void(*)(void))0x80001800;
-                    run(reload);
-                }
-            }
-
-            legacy_chainload_boot_game(NULL, true);
-        } else {
-            chainload_swiss_game(NULL, true, false);
-        }
+        chainload_boot_game(NULL, true);
     }
 
     char *boot_path = boot_entry.path;
@@ -441,21 +454,17 @@ __attribute_used__ void bs2start() {
         custom_OSReport("Booting DOL\n");
         load_stub();
 
-        dol_info_t info = load_dol(boot_path, false);
+        dol_info_t info = load_dol_file(boot_path, false);
         run(info.entrypoint);
     } else {
         custom_OSReport("Booting ISO\n");
 
-        char *game_code = (char*)boot_entry.extra.game_id;
-        bool is_xeno_crisis = (game_code[0] == 'G' && game_code[1] == 'C' && game_code[2] == 'R');
-        bool use_swiss_patches = force_swiss_boot;
-
-        if ((force_legacy_boot && !use_swiss_patches) || is_xeno_crisis) {
+        if (!force_swiss_boot) {
             custom_OSReport("Booting ISO (custom apploader)\n");
-            legacy_chainload_boot_game(&boot_entry, false);
+            chainload_boot_game(&boot_entry, false);
         } else {
-            custom_OSReport("Booting ISO (swiss chainload) [%s]\n", use_swiss_patches ? "PATCHED" : "CLEAN");
-            chainload_swiss_game(boot_path, false, use_swiss_patches);
+            custom_OSReport("Booting ISO (swiss chainload)\n");
+            chainload_swiss_game(boot_path, false);
         }
     }
 

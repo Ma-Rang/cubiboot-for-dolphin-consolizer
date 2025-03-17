@@ -1,6 +1,7 @@
 #include <gctypes.h>
 
-#define CRC(x) x
+#define DIRTYCRC(x) x
+#define CLEANCRC(x) x
 #define SDA(x) x
 
 typedef enum ipl_types {
@@ -33,11 +34,12 @@ typedef struct {
     char *name;
     char *reloc_prefix;
     char *patch_suffix;
-    u32 crc;
+    u32 clean_crc;
+    u32 dirty_crc;
     u32 sda;
-} bios_item;
+} bios_item_t;
 
-extern bios_item *current_bios;
+extern bios_item_t *current_bios;
 
 void load_ipl(bool is_running_dolphin);
 u32 get_sda_address();

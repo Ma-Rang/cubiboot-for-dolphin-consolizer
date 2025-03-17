@@ -32,6 +32,7 @@ char *strcpy (char *dst0, const char *src0);
 char *strrchr (const char *s, int i);
 char *strchr (const char *s1, int i);
 int strcasecmp (const char *s1, const char *s2);
+int strncmp(const char *s1, const char *s2, size_t n);
 int strcmp (const char *s1, const char *s2);
 size_t strlen (const char *str);
 char *strtok (register char *__restrict s, register const char *__restrict delim);

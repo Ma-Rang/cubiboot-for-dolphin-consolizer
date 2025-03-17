@@ -122,6 +122,10 @@ dolphin_game_into_t get_game_info(char *game_path) {
             memcpy(info.game_id, &header, 6);
             info.disc_num = header.DiscID;
             info.disc_ver = header.Version;
+            info.dol_offset = header.DOLOffset;
+            info.fst_offset = header.FSTOffset;
+            info.fst_size = header.FSTSize;
+            info.max_fst_size = header.MaxFSTSize;
 
             dvd_custom_close(status->fd);
             return info;
@@ -150,6 +154,10 @@ dolphin_game_into_t get_game_info(char *game_path) {
             memcpy(info.game_id, &header, 6);
             info.disc_num = header.DiscID;
             info.disc_ver = header.Version;
+            info.dol_offset = header.DOLOffset;
+            info.fst_offset = header.FSTOffset;
+            info.fst_size = header.FSTSize;
+            info.max_fst_size = header.MaxFSTSize;
 
             dvd_custom_close(status->fd);
             return info;

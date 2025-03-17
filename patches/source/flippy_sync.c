@@ -38,6 +38,7 @@ extern void DCInvalidateRange(void *startaddress, u32 len);
 
 // DI Commands
 #define DVD_OEM_INQUIRY 0x12000000
+#define DVD_OEM_AUDIO 0xE4000000
 #define DVD_OEM_READ 0xA8000000
 #define DVD_FLIPPY_BOOTLOADER_STATUS 0xB4000000
 #define DVD_FLIPPY_FILEAPI_BASE 0xB5000000
@@ -64,6 +65,29 @@ dvd_info_t *dvd_inquiry() {
     DCInvalidateRange((u8 *)&info, sizeof(dvd_info_t));
 
     return &info;
+}
+
+
+void dvd_audio_config(char use_streaming, char size) {
+    _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
+    _di_regs[DI_CVR] = 0; // clear cover int
+
+	if(use_streaming) {
+        if (!size) size = 10;
+        _di_regs[DI_CMDBUF0] = DVD_OEM_AUDIO | 0x10000 | size;
+        _di_regs[DI_CMDBUF1] = 0;
+        _di_regs[DI_CMDBUF2] = 0;
+	} else {
+        _di_regs[DI_CMDBUF0] = DVD_OEM_AUDIO;
+        _di_regs[DI_CMDBUF1] = 0;
+        _di_regs[DI_CMDBUF2] = 0;
+	}
+
+    _di_regs[DI_MAR] = 0;
+    _di_regs[DI_LENGTH] = 0;
+    _di_regs[DI_CR] = DI_CR_TSTART; // start transfer
+
+    while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
 }
 
 // === flippy custom commands
@@ -150,6 +174,56 @@ int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
     if (_di_regs[DI_SR] & DI_SR_DEINT) {
         return 1;
     }
+    return 0;
+}
+
+int dvd_read_data(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
+    uint64_t current_offset = offset;
+    unsigned int total_read = 0;
+    unsigned int remaining = len;
+
+    if(((uint32_t)dst & 0x1F) || (len & 0x1F) || (offset & 0x3)) //Buffer, length, or offset is not aligned
+    {
+        static GCN_ALIGNED(u8) aligned_buffer[FD_IPC_MAXRESP];
+
+        while (remaining > 0)
+        {
+            // Ensure the read offset is aligned to 4 bytes
+            uint64_t aligned_offset = current_offset & ~0x3;
+            uint32_t offset_adjustment = current_offset - aligned_offset;
+
+            // Calculate the amount to read, taking alignment into account
+            unsigned int to_read = remaining > FD_IPC_MAXRESP ? FD_IPC_MAXRESP : remaining;
+            if (to_read + offset_adjustment > FD_IPC_MAXRESP) {
+                to_read = FD_IPC_MAXRESP - offset_adjustment;
+            }
+            to_read = (to_read + 31) & ~31; // Round up to nearest 32 bytes
+
+            // Perform the read into the aligned buffer
+            int result = dvd_read(aligned_buffer, to_read, aligned_offset, fd);
+            if (result != 0) {
+                custom_OSReport("dvd_read_data failed: %d\n", result);
+                return result;  // Return the error code if dvd_read fails
+            }
+
+            // Copy the relevant portion from the aligned buffer to destination
+            unsigned int to_copy = remaining > FD_IPC_MAXRESP ? FD_IPC_MAXRESP : remaining;
+            memcpy(dst + total_read, aligned_buffer + offset_adjustment, to_copy);
+            total_read += to_copy;
+            current_offset += to_copy;
+            remaining -= to_copy;
+        }
+    }
+    else //Buffer, length, and offset are aligned
+    {
+        int result = dvd_read(dst, len, offset, fd);
+        if (result != 0)
+        {
+            custom_OSReport("dvd_read_data failed: %d\n", result);
+            return result; // Return the error code if dvd_read fails
+        }
+    }
+
     return 0;
 }
 
