@@ -44,4 +44,5 @@
 #define RGBA_TO_RGB444(x) ((x & 0xf0000000) >> 17) | ((x & 0x00f00000) >> 13) | ((x & 0x0000f000) >> 9) | ((x & 0x000000e0) >> 5)
 #define RGBA_TO_RGB5A3(x) (x & 0xff) < 0xe0 ? RGBA_TO_RGB444(x) : RGBA_TO_RGB555(x)
 
+uint32_t* Metaphrasis_convertBufferToRGBA8(uint32_t* rgbaBuffer, uint32_t *outBuffer, uint16_t bufferWidth, uint16_t bufferHeight);
 uint32_t* Metaphrasis_convertBufferToRGB5A3(uint32_t *rgbaBuffer, uint32_t *outBuffer, uint16_t bufferWidth, uint16_t bufferHeight);

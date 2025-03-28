@@ -1,6 +1,7 @@
 #define __attribute_used__ __attribute__((used))
 #define __attribute_data__ __attribute__((section(".data")))
 #define __attribute_data_lowmem__ __attribute__((section(".data_lowmem")))
+#define __attribute_data_empty__ __attribute__((section(".data_empty")))
 #define __attribute_aligned_data_lowmem__ __attribute__((aligned(32), section(".data_lowmem")))
 #define __attribute_reloc__ __attribute__((section(".reloc")))
 #define __attribute_aligned_data__ __attribute__((aligned(32), section(".data"))) 

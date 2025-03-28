@@ -32,7 +32,6 @@
 #include "state.h"
 #include "settings.h"
 #include "logo.h"
-#include "pngu/pngu.h"
 
 #include "config.h"
 #include "gcm.h"
@@ -321,33 +320,9 @@ int main(int argc, char **argv) {
         prog_halt("Failed BIOS Patching relocation\n");
     }
 
-    // // local vars
-    // u8 *image_data = NULL;
-    // iprintf("XXX: settings.cube_logo = %s\n", settings.cube_logo);
-    // if (settings.cube_logo != NULL && strlen(settings.cube_logo) > 0) {
-    //     iprintf("YYY\n");
-    //     image_data = load_logo_texture(settings.cube_logo);
-    //     iprintf("img can be found at %08x\n", (u32)image_data);
-    // }
-
-    // // load current program
-    // prog_entrypoint = (u32)&_start;
-    // prog_src = (u32)current_dol_buf;
-    // prog_dst = (u32)&_start; // (u32*)0x80600000;
-    // prog_len = current_dol_len;
-
-    // iprintf("Current program start = %08x\n", prog_entrypoint);
-
-    // // Copy program metadata into place
-    // set_patch_value(symshdr, syment, symstringdata, "prog_entrypoint", prog_entrypoint);
-    // set_patch_value(symshdr, syment, symstringdata, "prog_src", prog_src);
-    // set_patch_value(symshdr, syment, symstringdata, "prog_dst", prog_dst);
-    // set_patch_value(symshdr, syment, symstringdata, "prog_len", prog_len);
-
     // Copy settings into place
     set_patch_value(symshdr, syment, symstringdata, "start_passthrough_game", force_passthrough);
     set_patch_value(symshdr, syment, symstringdata, "cube_color", settings.cube_color);
-    // set_patch_value(symshdr, syment, symstringdata, "cube_text_tex", (u32)image_data);
     set_patch_value(symshdr, syment, symstringdata, "force_progressive", settings.progressive_enabled);
     set_patch_value(symshdr, syment, symstringdata, "force_swiss_boot", settings.force_swiss_default);
 
@@ -356,6 +331,13 @@ int main(int argc, char **argv) {
 
     set_patch_value(symshdr, syment, symstringdata, "preboot_delay_ms", settings.preboot_delay_ms);
     set_patch_value(symshdr, syment, symstringdata, "postboot_delay_ms", settings.postboot_delay_ms);
+
+    // Copy settings string
+    void *cube_logo_ptr = (void*)get_symbol_value(symshdr, syment, symstringdata, "cube_logo_path");
+    if (cube_logo_ptr != NULL && settings.cube_logo != NULL) {
+        iprintf("Copying cube_logo_path: %p\n", cube_logo_ptr);
+        strcpy(cube_logo_ptr, settings.cube_logo);
+    }
 
     // Copy other variables
     set_patch_value(symshdr, syment, symstringdata, "is_running_dolphin", is_running_dolphin);

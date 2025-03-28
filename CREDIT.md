@@ -21,8 +21,6 @@
 `patches/source/arith64.c` credit to github.com/glitchub/arith64 <br/>
 `patches/include/gx_regdef.h` credit to libogc2 <br/>
 `patches/source/crc32.c` credit to tinf <br/>
-`patches/source/ok_png.c` credit to github.com/brackeen/ok-file-formats <br/>
-`patches/source/ok_png.h` credit to github.com/brackeen/ok-file-formats <br/>
 `patches/source/metaphrasis.c` credit to github.com/ArminTamzarian/metaphrasis <br/>
 `patches/source/metaphrasis.h` credit to github.com/ArminTamzarian/metaphrasis <br/>
 `patches/source/decomp_ar.c` credit to github.com/PrimeDecomp/prime <br/>

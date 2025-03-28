@@ -201,47 +201,6 @@ inline void encode_tex_data(void* img_data, void* texture_data, uint16_t buffer_
 	return;
 }
 
-// credit to https://github.com/ArminTamzarian/metaphrasis
-inline void Metaphrasis_convertBufferToRGBA8(void* rgbaBuffer, void* dataBufferRGBA8, uint16_t bufferWidth, uint16_t bufferHeight) {
-	uint32_t bufferSize = (bufferWidth * bufferHeight) << 2;
-	memset(dataBufferRGBA8, 0x00, bufferSize);
-
-	uint8_t *src = (uint8_t *)rgbaBuffer;
-	uint8_t *dst = (uint8_t *)dataBufferRGBA8;
-
-	for(uint16_t block = 0; block < bufferHeight; block += 4) {
-		for(uint16_t i = 0; i < bufferWidth; i += 4) {
-            for (uint32_t c = 0; c < 4; c++) {
-				uint32_t blockWid = (((block + c) * bufferWidth) + i) << 2 ;
-
-				*dst++ = src[blockWid + 3];  // ar = 0
-				*dst++ = src[blockWid + 0];
-				*dst++ = src[blockWid + 7];  // ar = 1
-				*dst++ = src[blockWid + 4];
-				*dst++ = src[blockWid + 11]; // ar = 2
-				*dst++ = src[blockWid + 8];
-				*dst++ = src[blockWid + 15]; // ar = 3
-				*dst++ = src[blockWid + 12];
-            }
-            for (uint32_t c = 0; c < 4; c++) {
-				uint32_t blockWid = (((block + c) * bufferWidth) + i ) << 2 ;
-
-				*dst++ = src[blockWid + 1];  // gb = 0
-				*dst++ = src[blockWid + 2];
-				*dst++ = src[blockWid + 5];  // gb = 1
-				*dst++ = src[blockWid + 6];
-				*dst++ = src[blockWid + 9];  // gb = 2
-				*dst++ = src[blockWid + 10];
-				*dst++ = src[blockWid + 13]; // gb = 3
-				*dst++ = src[blockWid + 14];
-            }
-		}
-	}
-	DCFlushRange(dataBufferRGBA8, bufferSize);
-
-	return;
-}
-
 // from Nintendont
 static inline void iwrite32(u32 addr, u32 x) {
 	asm volatile("stw %0,0(%1) ; eieio" : : "r"(x), "b"(0x40000000 | addr));

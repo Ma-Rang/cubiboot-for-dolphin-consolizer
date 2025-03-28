@@ -12,6 +12,7 @@
 #include <ogc/system.h>
 #include "picolibc.h" // for strcasecmp
 
+#include "attr.h"
 #include "reloc.h"
 #include "flippy_sync.h"
 #include "dvd_threaded.h"
@@ -103,7 +104,7 @@ dolphin_game_into_t get_game_info(char *game_path) {
         return (dolphin_game_into_t) { .valid = false };
     }
 
-    __attribute__((aligned(32))) static DiskHeader header;
+    __attribute_aligned_data_lowmem__ static DiskHeader header;
     dvd_threaded_read(&header, sizeof(DiskHeader), 0, status->fd); //Read in the disc header
 
     // OSReport("DEBUG: disk header loaded\n");

@@ -20,7 +20,7 @@ patch_inst_pal "_reduce_aram_alloc" 0x81301040 0x81301040 0x81301040 lis r5, 0x1
 // patch_inst_ntsc "_force_lang" 0x8130b5b8 0x8130b740 0x8130bab4 0x8130bacc bl set_forced_lang
 patch_inst_ntsc "_force_lang" 0x8130b5b4 0x8130b73c 0x8130bab0 0x8130bac8 li r0, 0 // Force English=0, Japanese=2 (NTSC Only)
 patch_inst_pal "_fix_font_japanese" 0x81309600 0x00000000 0x81309740 b GetFontCode
-patch_inst vNTSC_10(_fix_font_decode_buf) 0x813083d0 lis r3, -0x7e90 // Move buffer to himem (0x81700000)
+patch_inst vNTSC_10(_fix_font_decode_buf) 0x813083d0 lis r3, -0x7e90 // Move buffer to himem (0x81700000) TODO: wrap this with an alloc
 patch_inst vNTSC_10(_fix_banner_bnr2) 0x81302778 nop
 
 patch_inst_ntsc "_patch_font_init" 0x81301240 0x8130107c 0x81301430 0x81301434 bl setup_fonts
@@ -51,7 +51,7 @@ patch_inst_pal "_reduce_arena_size" 0x8135b83c 0x8135817c 0x81360d10 lis r3, -0x
 
 patch_inst vNTSC_10(_increase_heap_size) 0x81307ed8 lis r3, -0x7fa0 // NTSC10: 0x80800000 -> 0x80600000 (stability hack)
 patch_inst_ntsc "_increase_heap_size" 0x00000000 0x81307dc0 0x8130815c 0x81308174 lis r3, -0x7fb0 // 0x80700000 -> 0x805000000
-patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0x7fb0 // 0x80700000 -> 0x806000000
+patch_inst_pal "_increase_heap_size" 0x81307dc0 0x81307dc0 0x81307f28 lis r3, -0x7fb0 // 0x80700000 -> 0x805000000
 
 patch_inst_ntsc "_patch_thread_init" 0x81301234 0x81301070 0x81301424 0x81301428 bl pre_thread_init
 patch_inst_pal "_patch_thread_init" 0x81301070 0x81301070 0x813011dc bl pre_thread_init
@@ -72,7 +72,7 @@ patch_inst_pal "_gameselect_replace_input" 0x81327968 0x81326ec0 0x81327aa8 bl h
     repeat_inst 44 nop
 .endm
 
-// NOTE: this is a mid-finction patch
+// NOTE: this is a mid-function patch
 patch_inst_ntsc "_gameselect_draw_helper" 0x81326c14 0x81327430 0x813277c8 0x813277e0 routine_gameselect_matrix_helper
 patch_inst_pal "_gameselect_draw_helper" 0x81327e04 0x8132735c 0x81327f44 routine_gameselect_matrix_helper
 

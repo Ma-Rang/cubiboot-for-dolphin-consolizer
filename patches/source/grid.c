@@ -18,7 +18,7 @@
 #define MAX_LINES 240 // 240 lines * 8 slots = 1920 slots
 
 bool grid_setup_done = false;
-line_backing_t browser_lines[MAX_LINES]; 
+__attribute_data_empty__ line_backing_t browser_lines[MAX_LINES];
 
 // ===============================================================================
 
