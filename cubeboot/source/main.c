@@ -31,12 +31,17 @@
 
 #include "state.h"
 #include "settings.h"
-#include "logo.h"
 
 #include "config.h"
-#include "loader.h"
+#include "gcm.h"
+#include "bnr.h"
 
-static u32 prog_entrypoint, prog_dst, prog_src, prog_len;
+#include "flippy_sync.h"
+#include "sram.h"
+
+#define DEFAULT_FIFO_SIZE (256 * 1024)
+
+#define STUB_ADDR 0x80001800
 
 #define BS2_BASE_ADDR 0x81300000
 static void (*bs2entry)(void) = (void(*)(void))BS2_BASE_ADDR;
@@ -49,21 +54,13 @@ extern const void _start;
 extern const void _edata;
 extern const void _end;
 
-u32 can_load_dol = 0;
-
 void *xfb;
 GXRModeObj *rmode;
 
-void __SYS_PreInit() {
-    if (state->boot_code == 0xCAFEBEEF) return;
+// this will be used during system init
+void *__attribute__((used)) __myArena1Hi = (void*)BS2_BASE_ADDR;
 
-    SYS_SetArenaHi((void*)BS2_BASE_ADDR);
-
-    current_dol_len = &_edata - &_start;
-    memcpy(current_dol_buf, &_start, current_dol_len);
-}
-
-int main() {
+int main(int argc, char **argv) {
     u64 startts, endts;
 
     startts = ticks_to_millisecs(gettime());
@@ -125,8 +122,14 @@ int main() {
 	VIDEO_SetBlack(FALSE);
 	VIDEO_Flush();
 	VIDEO_WaitVSync();
-	if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
-    // // debug above
+    if (rmode->viTVMode & VI_NON_INTERLACE) {
+        VIDEO_WaitVSync();
+    }
+    else {
+        while (VIDEO_GetNextField())
+            VIDEO_WaitVSync();
+    }
+
 #endif
 
 #ifdef DOLPHIN_PRINT_ENABLE
@@ -139,92 +142,43 @@ int main() {
 #endif
 
 #ifdef VIDEO_ENABLE
-    iprintf("XFB = %08x [max=%x]\n", (u32)xfb, VIDEO_GetFrameBufferSize(&TVPal576ProgScale));
-#endif
-    iprintf("current_dol_len = %d\n", current_dol_len);
-
-    // setup config device
-    if (mount_available_device() != SD_OK) {
-        iprintf("Could not find an inserted SD card\n");
-    }
-
-    if (is_device_mounted()) {
-        load_settings();
-    }
-
-    // check if we have a bootable dol
-    if (check_load_program()) {
-        can_load_dol = true;
-    }
-
-    iprintf("Checkup, done=%08x\n", state->boot_code);
-    if (state->boot_code == 0xCAFEBEEF) {
-        iprintf("He's alive! The doc's alive! He's in the old west, but he's alive!!\n");
-
-#ifdef VIDEO_ENABLE
-        VIDEO_WaitVSync();
+    iprintf("XFB = %08x [max=%x]\n", (u32)xfb, VIDEO_GetFrameBufferSize(rmode));
+    // free(backing_framebuffer); // free the backing framebuffer, we don't need it anymore
 #endif
 
-        // check for a held button
-        int held_max_index = -1;
-        u64 held_current_max = 0;
-        for (int i = 0; i < MAX_BUTTONS; i++) {
-            if (state->held_buttons[i].status == 0) continue;
+    ipl_metadata_t *metadata = (void*)0x81500000 - sizeof(ipl_metadata_t);
+    iprintf("EARLY Metadata:\n");
+    iprintf("\tMagic: %x\n", metadata->magic);
+    iprintf("\tRevision: %x\n", metadata->revision);
+    iprintf("\tBlob checksum: %x\n", metadata->blob_checksum);
+    iprintf("\tCode size: %x\n", metadata->code_size);
+    iprintf("\tCode checksum: %x\n", metadata->code_checksum);
 
-            u64 ts = state->held_buttons[i].timestamp;
-            u32 ms = ticks_to_millisecs(ts);
-
-            if (ms > held_current_max) {
-                held_max_index = i;
-                held_current_max = ms;
-            }
-
-            iprintf("HELD: %s\n", buttons_names[i]);
-        }
-
-        // only boot when held > 300ms
-        if (held_current_max < 300) {
-            held_max_index = -1;
-        }
-
-        if (held_max_index != -1) {
-            char *button_name = buttons_names[held_max_index];
-            iprintf("MAX HELD: %s\n", button_name);
-            char buf[64];
-
-            char *filename = settings.boot_buttons[held_max_index];
-            if (filename == NULL) {
-                filename = &buf[0];
-                strcpy(filename, button_name);
-                strcat(filename, ".dol");
-            }
-
-            if (*button_name == '_') {
-                filename = NULL;
-            }
-
-            boot_program(filename);
-        } else {
-            boot_program(NULL);
-        }
+    // setup passthrough arg
+    u32 force_passthrough = 0;
+    if (argc > 1 && strcmp(argv[1], "passthrough") == 0) {
+        force_passthrough = 1;
     }
 
-    if(settings.fallback_enabled) {
-        int fallback_size = get_file_size("/fallback.bin");
-        iprintf("fallback size = %d\n", fallback_size);
-
-        if (load_file_buffer("/fallback.bin", current_dol_buf) != SD_OK) {
-            prog_halt("Could not load fallback file\n");
-            return 1;
-        }
-
-        current_dol_len = fallback_size;
+    if (*(u32*)STUB_ADDR == 0x50415353) {
+        force_passthrough = 1;
     }
+
+    iprintf("force_passthrough = %d\n", force_passthrough);
+
+    // setup settings
+    iprintf("Loading settings\n");
+    load_settings();
+
+    // fix sram
+    set_sram_swiss(true);
+    create_swiss_config();
 
 //// fun stuff
 
     // load ipl
-    load_ipl();
+    bool is_running_dolphin = is_dolphin();
+    load_ipl(is_running_dolphin);
 
     // disable progressive on unsupported IPLs
     if (current_bios->version == IPL_NTSC_10) {
@@ -260,7 +214,8 @@ int main() {
 
         if (shdr->sh_type == SHT_NOBITS && strncmp(patch_prefix, stringdata + shdr->sh_name, patch_prefix_len) != 0) {
             iprintf("Skipping NOBITS %s @ %08x!!\n", stringdata + shdr->sh_name, shdr->sh_addr);
-            memset((void*)shdr->sh_addr, 0, shdr->sh_size);
+            // TODO: this area may overlap heap (like with .data_lowmem)
+            // if (shdr->sh_addr > (u32)&_end) memset((void*)shdr->sh_addr, 0, shdr->sh_size);
         } else {
             // check if this is a patch section
             uint32_t sh_size = 0;
@@ -306,6 +261,8 @@ int main() {
         }
     }
 
+    bool failed_patching = false;
+
     // Copy symbol relocations by region
     iprintf(".reloc section [0x%08x - 0x%08x]\n", reloc_start, reloc_end);
     for (int i = 0; i < (symshdr->sh_size / sizeof(Elf32_Sym)); ++i) {
@@ -331,47 +288,44 @@ int main() {
                 *(u32*)syment[i].st_value = val;
             } else {
                 iprintf("ERROR broken reloc %s = %x\n", current_symname, syment[i].st_value);
+                failed_patching = true;
             }
         }
     }
 
-
-    u8 *image_data = NULL;
-    if (settings.cube_logo != NULL) {
-        image_data = load_logo_texture(settings.cube_logo);
-        iprintf("img can be found at %08x\n", (u32)image_data);
+    if (failed_patching) {
+        prog_halt("Failed BIOS Patching relocation\n");
     }
 
-    // load current program
-    prog_entrypoint = (u32)&_start;
-    prog_src = (u32)current_dol_buf;
-    prog_dst = (u32)&_start; // (u32*)0x80600000;
-    prog_len = current_dol_len;
-
-    iprintf("Current program start = %08x\n", prog_entrypoint);
-
-    // Copy program metadata into place
-    set_patch_value(symshdr, syment, symstringdata, "prog_entrypoint", prog_entrypoint);
-    set_patch_value(symshdr, syment, symstringdata, "prog_src", prog_src);
-    set_patch_value(symshdr, syment, symstringdata, "prog_dst", prog_dst);
-    set_patch_value(symshdr, syment, symstringdata, "prog_len", prog_len);
-
     // Copy settings into place
-    set_patch_value(symshdr, syment, symstringdata, "start_game", can_load_dol);
+    set_patch_value(symshdr, syment, symstringdata, "start_passthrough_game", force_passthrough);
     set_patch_value(symshdr, syment, symstringdata, "cube_color", settings.cube_color);
-    set_patch_value(symshdr, syment, symstringdata, "cube_text_tex", (u32)image_data);
     set_patch_value(symshdr, syment, symstringdata, "force_progressive", settings.progressive_enabled);
+    set_patch_value(symshdr, syment, symstringdata, "force_swiss_boot", settings.force_swiss_default);
+
+    set_patch_value(symshdr, syment, symstringdata, "disable_mcp_select", settings.disable_mcp_select);
+    set_patch_value(symshdr, syment, symstringdata, "show_watermark", settings.show_watermark);
 
     set_patch_value(symshdr, syment, symstringdata, "preboot_delay_ms", settings.preboot_delay_ms);
     set_patch_value(symshdr, syment, symstringdata, "postboot_delay_ms", settings.postboot_delay_ms);
 
-    // while(1);
+    // // Copy settings string
+    // void *cube_logo_ptr = (void*)get_symbol_value(symshdr, syment, symstringdata, "cube_logo_path");
+    // if (cube_logo_ptr != NULL && settings.cube_logo != NULL) {
+    //     iprintf("Copying cube_logo_path: %p\n", cube_logo_ptr);
+    //     strcpy(cube_logo_ptr, settings.cube_logo);
+    // }
 
-    unmount_current_device();
+    // Copy other variables
+    set_patch_value(symshdr, syment, symstringdata, "is_running_dolphin", is_running_dolphin);
+
+    // unmount_current_device();
 
 #ifdef VIDEO_ENABLE
     VIDEO_WaitVSync();
 #endif
+
+    iprintf("Patches applied\n");
 
     /*** Shutdown libOGC ***/
     GX_AbortFrame();
@@ -386,11 +340,6 @@ int main() {
 
     /*** Shutdown all threads and exit to this method ***/
     iprintf("IPL BOOTING\n");
-
-#ifdef DOLPHIN_DELAY_ENABLE
-    // fix for dolphin cache
-    udelay(3 * 1000 * 1000);
-#endif
 
     iprintf("DONE\n");
 

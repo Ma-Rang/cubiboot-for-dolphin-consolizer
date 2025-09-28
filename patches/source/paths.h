@@ -1,0 +1,1 @@
+char *FileSuffix(char *path);

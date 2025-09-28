@@ -1,6 +1,8 @@
 #include <gctypes.h>
 #include "time.h"
 
+#include "dolphin_os.h"
+
 u32 gettick(void) {
 	u32 result;
 	__asm__ __volatile__ (
@@ -66,3 +68,16 @@ void udelay(unsigned us) {
 			break;
 	}
 }
+
+// this function yields till timeout is reached
+void udelay_threaded(unsigned us) {
+	unsigned long long start, end;
+	start = gettime();
+	while (1) {
+		end = gettime();
+		if (diff_usec(start,end) >= us)
+			break;
+		OSYieldThread();
+	}
+}
+

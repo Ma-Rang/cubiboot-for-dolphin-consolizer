@@ -17,20 +17,20 @@ char *buttons_names[] = {
     "right", // RIGHT	0x0002
     "down",  // DOWN	0x0004
     "up",    // UP		0x0008
-    "z",     // Z		0x0010
-    "r",     // R		0x0020
-    "l",     // L		0x0040
-    "_",     // origin  0x0080 (NOT USED)
-    "_",     // A		0x0100 (NOT ALLOWED)
+    "_",     // Z		0x0010 (NOT ALLOWED) used to switch sound
+    "_",     // R		0x0020 (NOT ALLOWED) used by bootloader
+    "_",     // L		0x0040 (NOT ALLOWED) used by bootloader
+    "_",     // origin  0x0080 (NOT ALLOWED) used by pad library
+    "_",     // A		0x0100 (NOT ALLOWED) used to force menu
     "b",     // B		0x0200
-    "x",     // X		0x0400
+    "_",     // X		0x0400 (NOT ALLOWED) used by bootloader
     "y",     // Y		0x0800
     "start", // START	0x1000
 };
 
 void load_settings() {
     memset(&settings, 0, sizeof(settings));
-    int config_size = get_file_size("/cubeboot.ini");
+    int config_size = get_file_size("/config.ini");
     if (config_size == SD_FAIL) return;
 
     void *config_buf = memalign(32, config_size + 1);
@@ -39,52 +39,56 @@ void load_settings() {
         return;
     }
 
-    if (load_file_buffer("/cubeboot.ini", config_buf) != SD_OK) {
+    if (load_file_buffer("/config.ini", config_buf) != SD_OK) {
         prog_halt("Could not find config file\n");
         return;
     }
 
-    ((u8*)config_buf)[config_size - 1] = '\0';
+    ((char*)config_buf)[config_size] = '\0';
+
+    // iprintf("DUMP:\n");
+    // iprintf("%s[END]\n\n", (char*)config_buf);
 
     ini_t *conf = ini_load(config_buf, config_size);
 
     // cube color
-    const char *cube_color_raw = ini_get(conf, "", "cube_color");
+    const char *cube_color_raw = ini_get(conf, "cubeboot", "cube_color");
     if (cube_color_raw != NULL) {
         if (strcmp(cube_color_raw, "random") == 0) {
             settings.cube_color = generate_random_color();
         } else {
             int vars = sscanf(cube_color_raw, "%x", &settings.cube_color);
             if (vars == EOF) settings.cube_color = 0;
+            iprintf("Found cube_color = #%x\n", settings.cube_color);
         }
     }
 
     // cube logo
-    const char *cube_logo = ini_get(conf, "", "cube_logo");
+    const char *cube_logo = ini_get(conf, "cubeboot", "cube_logo");
     if (cube_logo != NULL) {
         iprintf("Found cube_logo = %s\n", cube_logo);
         settings.cube_logo = (char*)cube_logo;
     }
 
     // default program
-    const char *default_program = ini_get(conf, "", "default_program");
+    const char *default_program = ini_get(conf, "cubeboot", "default_program");
     if (default_program != NULL) {
         iprintf("Found default_program = %s\n", default_program);
         settings.default_program = (char*)default_program;
     }
 
-    // fallback enable
-    int fallback_enabled = 0;
-    if (!ini_sget(conf, "", "force_fallback", "%d", &fallback_enabled)) {
-        settings.fallback_enabled = 0;
+    // swiss enable
+    int force_swiss_default = 0;
+    if (!ini_sget(conf, "cubeboot", "force_swiss_default", "%d", &force_swiss_default)) {
+        settings.force_swiss_default = 0;
     } else {
-        iprintf("Found force_fallback = %d\n", fallback_enabled);
-        settings.fallback_enabled = fallback_enabled;
+        iprintf("Found force_swiss_default = %d\n", force_swiss_default);
+        settings.force_swiss_default = force_swiss_default;
     }
 
     // progressive enable
     int progressive_enabled = 0;
-    if (!ini_sget(conf, "", "force_progressive", "%d", &progressive_enabled)) {
+    if (!ini_sget(conf, "cubeboot", "force_progressive", "%d", &progressive_enabled)) {
         settings.progressive_enabled = 0;
     } else {
         iprintf("Found progressive_enabled = %d\n", progressive_enabled);
@@ -93,7 +97,7 @@ void load_settings() {
 
     // preboot delay
     u32 preboot_delay_ms = 0;
-    if (!ini_sget(conf, "", "preboot_delay_ms", "%u", &preboot_delay_ms)) {
+    if (!ini_sget(conf, "cubeboot", "preboot_delay_ms", "%u", &preboot_delay_ms)) {
         settings.preboot_delay_ms = 0;
     } else {
         iprintf("Found preboot_delay_ms = %u\n", preboot_delay_ms);
@@ -102,11 +106,29 @@ void load_settings() {
 
     // postboot delay
     u32 postboot_delay_ms = 0;
-    if (!ini_sget(conf, "", "postboot_delay_ms", "%u", &postboot_delay_ms)) {
+    if (!ini_sget(conf, "cubeboot", "postboot_delay_ms", "%u", &postboot_delay_ms)) {
         settings.postboot_delay_ms = 0;
     } else {
         iprintf("Found postboot_delay_ms = %u\n", postboot_delay_ms);
         settings.postboot_delay_ms = postboot_delay_ms;
+    }
+
+    // show_watermark
+    int show_watermark = 0;
+    if (!ini_sget(conf, "cubeboot", "show_watermark", "%d", &show_watermark)) {
+        settings.show_watermark = 0;
+    } else {
+        iprintf("Found show_watermark = %d\n", show_watermark);
+        settings.show_watermark = show_watermark;
+    }
+
+    // disable_mcp_select
+    int disable_mcp_select = 0;
+    if (!ini_sget(conf, "cubeboot", "disable_mcp_select", "%d", &disable_mcp_select)) {
+        settings.disable_mcp_select = 0;
+    } else {
+        iprintf("Found disable_mcp_select = %d\n", disable_mcp_select);
+        settings.disable_mcp_select = disable_mcp_select;
     }
 
     // button presses
@@ -121,7 +143,7 @@ void load_settings() {
         char button_config_name[255];
         sprintf(button_config_name, "button_%s", button_name);
 
-        const char *dol_path = ini_get(conf, "", button_config_name);
+        const char *dol_path = ini_get(conf, "cubeboot", button_config_name);
         if (dol_path != NULL) {
             iprintf("Found %s = %s\n", button_config_name, dol_path);
 

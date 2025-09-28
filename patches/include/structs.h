@@ -4,6 +4,16 @@
 #include <ogc/video_types.h>
 #include <ogc/pad.h>
 
+#pragma once
+
+#define TEXT_ALIGN_CENTER 0
+#define TEXT_ALIGN_TOP 2
+
+#define ANALOG_UP       0x1000
+#define ANALOG_DOWN     0x2000
+#define ANALOG_LEFT     0x4000
+#define ANALOG_RIGHT    0x8000
+
 typedef struct state_t {
     s32 unk0;
     s32 unk1;
@@ -78,7 +88,7 @@ typedef struct mat_t {
     u8 unk6;
     u8 unk7;
     
-    u16 unk8[8];
+    u16 texmap_index[8];
 
     GXColor* color[2];
     void* unk9[4];
@@ -135,12 +145,22 @@ typedef struct tex_t {
     tex_data *dat;
 } tex;
 
+typedef struct model_part_t {
+    u32 unk0;
+    void* a;
+    void* b;
+    void* c;
+    void* d;
+    u16 unk1;
+    s16 unk2;
+} model_part;
+
 typedef struct model_data_t {
-    void* unka;
-    void* unkb;
+    void* unka; // used at load time
+    void* unkb; // used at load time
     
-    void* root;
-    void* unkc;
+    model_part* parts;
+    void* unkc; // maybe skel
     mat* mat;
 
     void* unk0;
@@ -165,10 +185,85 @@ typedef struct model_t {
 
     void *unk1;
     void *unk2;
+
+    s16 alpha;
+    s16 unk3;
 } model;
 
 typedef struct bios_pad_t {
     PADStatus pad;
-    u16 unk0; // maybe buttons_down
-    u16 unk1; // maybe buttons_up
+    u16 buttons_down;
+    u16 buttons_up;
+    u16 unk;
+    u16 analog_down;
+    u16 analog_up;
 } bios_pad;
+
+typedef struct text_draw_group {
+	u32 type;
+
+	u32 unk0_offset;
+	u32 metadata_offset;
+	u32 unk1_offset;
+
+	u16 unk2;
+	u16 unk3;
+	u16 unk4;
+} text_draw_group;
+
+typedef struct text_draw_metadata {
+	u32 type;
+
+    // positions use some weird (0 -> 10240) range with ~400 being underscan/overscan
+	u16 x;
+	u16 y;
+
+	u16 unk0; // maybe max_width
+	u16 unk1; // maybe max_height
+	u32 unk2;
+	u32 unk3;
+
+	u8 y_align;
+	u8 x_align;
+	s16 letter_spacing;
+	s16 line_spacing;
+	u16 size;
+	u16 border_obj;
+} text_draw_metadata;
+
+typedef struct text_group {
+	u32 type;
+
+	u16 arr_size;
+	u16 padding;
+} text_group;
+
+typedef struct text_metadata {
+	u16 draw_metadata_index;
+	u16 length;
+	u32 text_data_offset;
+} text_metadata;
+
+typedef struct box_draw_group {
+    u32 type;
+
+    u32	unk0;
+    u32	unk1;
+    u32	metadata_offset;
+} box_draw_group;
+
+typedef struct box_draw_metadata {
+    u32 type;
+    u16 center_x;
+    u16 center_y;
+    u16 width;
+    u16 height;
+    u16 inside_center_x;
+    u16 inside_center_y;
+    u16 inside_width;
+    u16 inside_height;
+    u16 border_index[4];
+    u8 border_unk[4];
+    GXColor top_color[2];
+    GXColor bottom_color[2];
+} box_draw_metadata;

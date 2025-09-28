@@ -4,7 +4,7 @@
 #include <sdcard/card_cmn.h>
 #include <sdcard/card_io.h>
 #include <sdcard/gcsd.h>
-#include "gcode.h"
+#include <ogc/dvd.h>
 #include "gcm.h"
 
 #include "uff.h"
@@ -14,7 +14,10 @@
 #include "halt.h"
 #include "helpers.h"
 
+#if 0
 #ifndef USE_FAT_PFF
+typedef uint64_t LBA_t;
+typedef unsigned char BYTE;
 #include "fatfs/diskio.h"
 #endif
 
@@ -30,18 +33,17 @@ static bool is_mounted = FALSE;
 
 // static struct gcm_system_area *low_mem = (struct gcm_system_area*)0x80000000;
 
-gcodecmdblk blk;
-gcodedrvinfo drive_info __attribute__((aligned(32)));
+dvdcmdblk blk;
+dvddrvinfo drive_info __attribute__((aligned(32)));
 static int has_drive = -1;
 
-static void drive_info_callback(s32 result, gcodecmdblk *blk) {
+static void drive_info_callback(s32 result, dvdcmdblk *blk) {
 	if(result >= 0) {
 		has_drive = 1;
 	} else {
         has_drive = 0;
     }
 }
-
 
 // check for inserted
 static int check_available_devices() {
@@ -54,9 +56,9 @@ static int check_available_devices() {
         //     continue;
 
         // skip ODE to speed up loading
-        if (driver->ioType == DEVICE_TYPE_GAMECUBE_GCODE) {
-            GCODE_Init();
-            GCODE_InquiryAsync(&blk, &drive_info, drive_info_callback);
+        if (driver->ioType == DEVICE_TYPE_GAMECUBE_DVD) {
+            DVD_Init();
+            DVD_InquiryAsync(&blk, &drive_info, drive_info_callback);
 
             // wait until done (1ms max)
             for (int i = 0; i < 10; i++) {
@@ -138,6 +140,7 @@ const char *get_current_dev_name() {
 const DISC_INTERFACE *get_current_device() {
     return current_device;
 }
+#endif
 
 int get_file_size(char *path) {
     PATH_FIX(path);

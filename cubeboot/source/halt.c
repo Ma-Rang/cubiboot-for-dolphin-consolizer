@@ -22,9 +22,12 @@ void prog_halt(char *msg) {
 	VIDEO_SetFramebuffer(exception_xfb);
     console_init(exception_xfb,20,20,rmode->fbWidth,rmode->xfbHeight,rmode->fbWidth*VI_DISPLAY_PIX_SZ);
     // CON_EnableGecko(EXI_CHANNEL_1, false);
+#ifdef VIDEO_ENABLE
+    VIDEO_WaitVSync();
 #endif
-    printf("\n====\nHALT\n====\n");
-    printf(msg);
+#endif
+    iprintf("\n====\nHALT\n====\n");
+    iprintf(msg);
 #ifdef VIDEO_ENABLE
     VIDEO_WaitVSync();
 #endif

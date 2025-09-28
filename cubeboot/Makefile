@@ -3,11 +3,15 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>devkitPro")
+endif
+
 ifeq ($(strip $(DEVKITPPC)),)
 $(error "Please set DEVKITPPC in your environment. export DEVKITPPC=<path to>devkitPPC")
 endif
 
-include $(DEVKITPPC)/gamecube_rules
+include $(DEVKITPRO)/libogc2/gamecube_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -17,7 +21,7 @@ include $(DEVKITPPC)/gamecube_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/fatfs source/pff source/pngu source/boot
+SOURCES		:=	source source/pngu source/boot
 DATA		:=	data  
 INCLUDES	:=	include
 
@@ -28,7 +32,6 @@ else
 endif
 
 PATCHES	:=	data/patches.elf
-
 PATCHES_PATH := $(PROJDIR)/$(PATCHES)
 
 #---------------------------------------------------------------------------------
@@ -38,12 +41,12 @@ PATCHES_PATH := $(PROJDIR)/$(PATCHES)
 CFLAGS	= -O3 -Wno-unused-function -Wall $(MACHDEP) $(INCLUDE)
 CXXFLAGS	=	$(CFLAGS)
 
-LDFLAGS	=	$(MACHDEP) -Wl,-Map,$(notdir $@).map
+LDFLAGS	=	$(MACHDEP) -Wl,-Map,$(notdir $@).map -T $(DEVKITPPC)/powerpc-eabi/lib/ogc.ld -T $(PROJDIR)/scripts/override.ld 
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:= -lasnd -logc -lpng16 -lz -lz -lm -lfat
+LIBS	:= -lasnd -logc -lz -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -114,8 +117,12 @@ $(PATCHES):
 	@[ -d $(DATA) ] || mkdir -p $(DATA)
 	@$(MAKE) --no-print-directory -C $(dir $(PROJDIR))/$(basename $(notdir $@))
 	@cp $(dir $(PROJDIR))/$(basename $(notdir $@))/$(notdir $@) $@
+	@env GO111MODULE=off go run $(PROJDIR)/scripts/validate-patches.go $@
 	@$(OBJCOPY) --remove-section .comment --remove-section .gnu.attributes $@
 
+#---------------------------------------------------------------------------------
+validate:
+	@env GO111MODULE=off go run $(PROJDIR)/scripts/validate-patches.go $(PATCHES) | grep -B1 'TARGET NOT FOUND' | grep Checking | cut -d'[' -f2 | tr -d ']' | sort
 
 #---------------------------------------------------------------------------------
 clean:
@@ -138,6 +145,22 @@ $(OUTPUT).elf: $(OFILES)
 # This rule links in binary data with the .elf extension
 #---------------------------------------------------------------------------------
 %.elf.o	%_elf.h:	%.elf
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .dol extension
+#---------------------------------------------------------------------------------
+%.dol.o	%_dol.h:	%.dol
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .bin extension
+#---------------------------------------------------------------------------------
+%.bin.o	%_bin.h: %.bin
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	$(bin2o)

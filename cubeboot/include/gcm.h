@@ -17,6 +17,11 @@
 
 #include <stdint.h>
 
+#define COUNTRY_JPN 0
+#define COUNTRY_USA 1
+#define COUNTRY_EUR 2
+#define COUNTRY_ODE 3 // ODE is not a real country code, only used by homebrew
+
 #define GCM_MAGIC		0xc2339f3d
 
 #define GCM_OPENING_BNR		"opening.bnr"
@@ -101,14 +106,6 @@ struct gcm_system_area {
 	struct gcm_disk_header_info dhi;
 
 	struct gcm_apploader_header al_header;
-	void *al_image;
-	off_t al_size;		/* aligned to 32 bytes */
-
-	void *fst_image;
-	off_t fst_size;		/* aligned to 32 bytes */
-
-	void *bnr_image;
-	off_t bnr_size;		/* aligned to 32 bytes */
 };
 
 

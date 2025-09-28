@@ -3,11 +3,15 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>devkitPro")
+endif
+
 ifeq ($(strip $(DEVKITPPC)),)
 $(error "Please set DEVKITPPC in your environment. export DEVKITPPC=<path to>devkitPPC")
 endif
 
-include $(DEVKITPPC)/gamecube_rules
+include $(DEVKITPRO)/libogc2/gamecube_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -17,7 +21,7 @@ include $(DEVKITPPC)/gamecube_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/picolibc source/tinyprintf
+SOURCES		:=	source source/picolibc source/pmalloc
 DATA		:=	data
 INCLUDES	:=	include
 
@@ -31,7 +35,7 @@ endif
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS		= -O2 -Wall -Wno-main -ffunction-sections -fdata-sections -Wno-unused-function $(MACHDEP) $(INCLUDE)
+CFLAGS		= -O2 -Wall -Wno-main -ffixed-r12 -ffixed-r13 -ffunction-sections -fdata-sections -Wno-unused-function -Werror-implicit-function-declaration $(MACHDEP) $(INCLUDE)
 CXXFLAGS	= $(CFLAGS)
 
 LINKER_SCRIPTS	:=
@@ -44,6 +48,7 @@ LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_ntsc12_101.ld
 LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_pal10.ld
 LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_pal11.ld
 LINKER_SCRIPTS	+= $(PROJDIR)/linker/link_pal12.ld
+LINKER_SCRIPTS	+= $(PROJDIR)/linker/combined.ld
 LDFLAGS		= $(MACHDEP) -Wl,-Map,$(notdir $@).map $(foreach script,$(LINKER_SCRIPTS),-T $(script)) -Wl,--gc-keep-exported -Wl,--nmagic -nolibc -nostdlib -nodefaultlibs
 
 #---------------------------------------------------------------------------------
@@ -137,6 +142,14 @@ $(OFILES_SOURCES) : $(HFILES)
 fake.o: patch.o
 	@$(PROJDIR)/scripts/patch-size.py $^
 	@touch $@
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .bin extension
+#---------------------------------------------------------------------------------
+%.bin.o	%_bin.h: %.bin
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
 
 -include $(DEPENDS)
 

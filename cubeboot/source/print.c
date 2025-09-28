@@ -1,4 +1,5 @@
 #include "print.h"
+#include <ogc/lwp_watchdog.h>
 
 #ifdef DOLPHIN_PRINT_ENABLE
 int iprintf(const char *fmt, ...) {
@@ -30,17 +31,26 @@ int iprintf(const char *fmt, ...) {
 	return length;
 }
 #elif defined(CONSOLE_ENABLE) || defined(GECKO_PRINT_ENABLE)
+u64 first_print = 0;
 int iprintf(const char *fmt, ...) {
+    if (first_print == 0) {
+        first_print = gettime();
+    }
+
     va_list args;
     unsigned long length;
+    // static char line[240];
     static char buf[256];
     uint32_t level;
 
     level = IRQ_Disable();
     va_start(args, fmt);
-    length = vsprintf((char *)buf, (char *)fmt, args);
+    // length = vsprintf(line, fmt, args);
+    // length = sprintf(buf, "(%f): %s", (f32)diff_usec(first_print, gettime()) / 1000.0, line);
+    length = vsnprintf(buf, sizeof(buf), fmt, args);
 
-    write(2, buf, length);
+    // write(2, buf, length);
+    usb_sendbuffer(EXI_CHANNEL_1, buf, length);
 
     va_end(args);
     IRQ_Restore(level);

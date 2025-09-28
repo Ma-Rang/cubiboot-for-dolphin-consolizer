@@ -7,7 +7,6 @@
 * softdev March 2007
 ***************************************************************************/
 #include <string.h>
-#include <malloc.h>
 #include <ogc/aram.h>
 #include <ogc/cache.h>
 #include <ogc/gx.h>
@@ -17,7 +16,8 @@
 #include "sidestep.h"
 #include "ssaram.h"
 
-#define ARAMSTART 0x8000
+#define ARAMSTART 0
+#define ARAMSIZE (10 * 1024 * 1024)
 
 /*** A global or two ***/
 static DOLHEADER *dolhdr;
@@ -168,28 +168,6 @@ void ARAMRun(u32 entrypoint, u32 dst, u32 src, u32 len)
 	__lwp_thread_stopmultitasking((void(*)())ARAMRunStub());
 }
 
-/****************************************************************************
-* ARAMClear
-*
-* To make life easy, just clear out the Auxilliary RAM completely.
-****************************************************************************/
-static void ARAMClear(void)
-{
-  int i;
-  unsigned char *buffer = memalign(32, 2048); /*** A little 2k buffer ***/
-
-  memset(buffer, 0, 2048);
-  DCFlushRange(buffer, 2048);
-
-  for (i = ARAMSTART; i < 0x1000000; i += 2048)
-  {
-    ARAMPut(buffer, (char *) i, 2048);
-    while (AR_GetDMAStatus());
-  }
-
-  free(buffer);
-}
-
 /*--- DOL Decoding functions -----------------------------------------------*/
 /****************************************************************************
 * DOLMinMax
@@ -252,9 +230,8 @@ int DOLtoARAM(unsigned char *dol, int argc, char *argv[])
   int i;
   struct __argv dolargs;
 
-  /*** Make sure ARAM subsystem is alive! ***/
-  AR_Init(NULL, 0); /*** No stack - we need it all ***/
-  ARAMClear();
+  // clear the part of ARAM we will use
+  ARAMClear(ARAMSTART, ARAMSIZE);
 
   /*** Get DOL header ***/
   dolhdr = (DOLHEADER *) dol;
