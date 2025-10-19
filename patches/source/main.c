@@ -499,6 +499,9 @@ __attribute_used__ void bs2start() {
 
     // no IPL code should be running after this point
 
+    extern void tsd_set_native(bool native);
+    tsd_set_native(true);
+
     while (!PADSync());
     OSDisableInterrupts();
     __OSStopAudioSystem();
@@ -521,8 +524,9 @@ __attribute_used__ void bs2start() {
         custom_OSReport("Booting DOL\n");
         load_stub();
 
-        dol_info_t info = load_dol_file(boot_path, false);
-        run(info.entrypoint);
+        chainload_swiss_game(boot_path, false); // use swiss as normal dol load is partially broken
+        //dol_info_t info = load_dol_file(boot_path, false);
+        //run(info.entrypoint);
     } else {
         custom_OSReport("Booting ISO\n");
 

@@ -41,3 +41,17 @@ void dvd_reset()
 	udelay(12);
 	*(volatile unsigned long*)0xcc003024 = v | 5;
 }
+
+void dvd_stop_motor()
+{
+	dvd[0] = 0x2E;
+	dvd[1] = 0;
+	dvd[2] = 0xE3000000;  // Stop motor command
+	dvd[3] = 0;
+	dvd[4] = 0;
+	dvd[5] = 0;
+	dvd[6] = 0;
+	dvd[7] = 1;  // Execute command
+	while (dvd[7] & 1)  // Wait for completion
+		;
+}

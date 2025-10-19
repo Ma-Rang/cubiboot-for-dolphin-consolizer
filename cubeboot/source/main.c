@@ -319,6 +319,9 @@ int main(int argc, char **argv) {
     // Copy other variables
     set_patch_value(symshdr, syment, symstringdata, "is_running_dolphin", is_running_dolphin);
 
+    extern int emu_sd_device;
+    set_patch_value(symshdr, syment, symstringdata, "emu_sd_device", emu_sd_device);
+
     // unmount_current_device();
 
 #ifdef VIDEO_ENABLE

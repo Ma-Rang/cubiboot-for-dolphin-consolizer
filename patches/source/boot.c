@@ -100,7 +100,7 @@ dol_info_t load_dol_file(char *path, bool flash) {
     return info;
 }
 
-void chainload_swiss_game(char *game_path, bool passthrough) {
+/*void chainload_swiss_game(char *game_path, bool passthrough) {
     dol_info_t info = load_dol_file("/swiss-gc.dol", true);
 
     char *argz = (void*)info.max_addr + 32;
@@ -142,7 +142,7 @@ void chainload_swiss_game(char *game_path, bool passthrough) {
     DCFlushRange(args, sizeof(struct __argv));
 
     run(info.entrypoint);
-}
+}*/
 
 const char GXPeekARGBPatch_bin[0x1c] = { // PIC
     0x3c, 0xc0, 0xc8, 0x00,    // 	lis		%r6, 0xC800
@@ -170,6 +170,9 @@ const int GXPokeARGBPatch_length = 0x18;
 extern const void _patches_end;
 
 void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
+    if (!passthrough)
+        chainload_swiss_game(boot_entry->path, false);
+
     u32 patchSize = 0x200; // setup patching space
     u32 topAddr = 0x81800000 - patchSize;
 

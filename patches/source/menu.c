@@ -30,6 +30,8 @@
 #include "gcm.h"
 #include "bnr.h"
 
+#include "emu/tweaks.h"
+
 // for setup
 __attribute_reloc__ void (*menu_alpha_setup)();
 
@@ -525,7 +527,8 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     GXColor white = {0xFF, 0xFF, 0xFF, ui_alpha};
 
     // text
-    draw_text("cubeboot loader", 20, 20, 4, &white);
+    draw_text("cubiboot loader", 20, 20, 4, &white);
+    draw_text("Load Disc (Z)", 20, 320, 4, &white);
 
     // icons
     for (int pass = 0; pass < 2; pass++) {
@@ -647,6 +650,10 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     if (entry->extra.game_id[3] == 'J') switch_lang_jpn();
     else switch_lang_eng();
 
+    bool can_boot = emu_can_boot(entry->type);
+    if (!can_boot)
+        emu_draw_boot_error(entry->type, alpha_1);
+
     if (entry->type == GM_FILE_TYPE_GAME && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
         // game banner
         setup_tex_draw(1, 0, 1);
@@ -665,14 +672,16 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     }
 
     // press start anim
-    draw_start_anim(ui_alpha); // TODO: fix alpha timing
+    if (can_boot)
+        draw_start_anim(ui_alpha); // TODO: fix alpha timing
 
     // fix camera again
     setup_gameselect_menu(0, 0, 0);
 
     // start string
     switch_lang_orig();
-    draw_blob_fixed(game_blob_text, game_blob_a, game_blob_b, &white);
+    if (can_boot)
+        draw_blob_fixed(game_blob_text, game_blob_a, game_blob_b, &white);
 
     return;
 }
@@ -748,13 +757,22 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     if (pad_status->buttons_down & PAD_TRIGGER_Z) {
+        if (emu_has_dvd()) {
+            Jac_StopSoundAll();
+            Jac_PlaySe(SOUND_MENU_FINAL);
+
+            extern u32 start_passthrough_game;
+            start_passthrough_game = 1;
+            *bs2start_ready = 1;
+        }
+        
         // add test code here
-        load_stub(); // exit to loader again
+        /*load_stub(); // exit to loader again
         u32 *sig = (u32*)0x80001804;
         if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
             static void (*reload)(void) = (void(*)(void))0x80001800;
             run(reload);
-        }
+        }*/
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_B) {
@@ -814,6 +832,10 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         Jac_StopSoundAll();
         Jac_PlaySe(SOUND_MENU_FINAL);
         gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
+
+        if (!emu_can_boot(entry->type))
+            return MENU_GAMESELECT_TRANSITION_ID;
+
         memcpy(&boot_entry, entry, sizeof(gm_file_entry_t));
         if (boot_entry.second != NULL) {
             memcpy(&second_boot_entry, boot_entry.second, sizeof(gm_file_entry_t));

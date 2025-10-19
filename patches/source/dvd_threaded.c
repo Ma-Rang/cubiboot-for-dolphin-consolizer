@@ -30,7 +30,7 @@
 
 static vu32* const _di_regs = (vu32*)0xCC006000;
 
-int dvd_threaded_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
+/*int dvd_threaded_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
 
     if (offset >> 2 > 0xFFFFFFFF) return -1;
 
@@ -56,4 +56,4 @@ int dvd_threaded_read(void* dst, unsigned int len, uint64_t offset, unsigned int
         return 1;
     }
 	return 0;
-}
+}*/

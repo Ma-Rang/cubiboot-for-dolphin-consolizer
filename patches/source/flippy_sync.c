@@ -92,7 +92,7 @@ void dvd_audio_config(char use_streaming, char size) {
 
 // === flippy custom commands
 
-void dvd_custom_close(uint32_t fd) {
+/*void dvd_custom_close(uint32_t fd) {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -105,9 +105,9 @@ void dvd_custom_close(uint32_t fd) {
     _di_regs[DI_CR] = DI_CR_TSTART; // start transfer
 
     while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-}
+}*/
 
-void dvd_set_default_fd(uint32_t current_fd, uint32_t second_fd) {
+/*void dvd_set_default_fd(uint32_t current_fd, uint32_t second_fd) {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -120,9 +120,9 @@ void dvd_set_default_fd(uint32_t current_fd, uint32_t second_fd) {
     _di_regs[DI_CR] = DI_CR_TSTART; // start transfer
 
     while (_di_regs[DI_CR] & DI_CR_TSTART); // transfer complete register
-}
+}*/
 
-int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd) {
+/*int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd) {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -143,18 +143,18 @@ int dvd_custom_write(char *buf, uint32_t offset, uint32_t length, uint32_t fd) {
         return 1;
     }
     return 0;
-}
+}*/
 
-int dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
+int normal_dvd_read(void* dst, unsigned int len, uint64_t offset, unsigned int fd) {
 
     if (offset >> 2 > 0xFFFFFFFF) return -1;
 
-    /* TODO What was going on with this setup code previously? Seems wrong
-    if ((((int)dst) & 0xC0000000) == 0x80000000) // cached?
-    {
-        dvd[0] = 0x2E;
-    }
-    */
+    // TODO What was going on with this setup code previously? Seems wrong
+    // if ((((int)dst) & 0xC0000000) == 0x80000000) // cached?
+    // {
+    //     dvd[0] = 0x2E;
+    // }
+    
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -227,7 +227,7 @@ int dvd_read_data(void* dst, unsigned int len, uint64_t offset, unsigned int fd)
     return 0;
 }
 
-static GCN_ALIGNED(file_status_t) status;
+/*static GCN_ALIGNED(file_status_t) status;
 file_status_t *dvd_custom_status() {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
@@ -250,9 +250,9 @@ file_status_t *dvd_custom_status() {
         return NULL;
     }
     return &status;
-}
+}*/
 
-int dvd_custom_readdir(file_entry_t* dst, unsigned int fd) {
+/*int dvd_custom_readdir(file_entry_t* dst, unsigned int fd) {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -274,9 +274,9 @@ int dvd_custom_readdir(file_entry_t* dst, unsigned int fd) {
         return 1;
     }
     return 0;
-}
+}*/
 
-int dvd_custom_unlink(char *path) {
+/*int dvd_custom_unlink(char *path) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);
@@ -303,9 +303,9 @@ int dvd_custom_unlink(char *path) {
         return 1;
     }
     return 0;
-}
+}*/
 
-int dvd_custom_unlink_flash(char *path) {
+/*int dvd_custom_unlink_flash(char *path) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);
@@ -332,9 +332,9 @@ int dvd_custom_unlink_flash(char *path) {
         return 1;
     }
     return 0;
-}
+}*/
 
-int dvd_custom_open(const char *path, uint8_t type, uint8_t flags) {
+/*int dvd_custom_open(const char *path, uint8_t type, uint8_t flags) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);
@@ -363,9 +363,9 @@ int dvd_custom_open(const char *path, uint8_t type, uint8_t flags) {
         return 1;
     }
     return 0;
-}
+}*/
 
-int dvd_custom_open_flash(const char *path, uint8_t type, uint8_t flags) {
+/*int dvd_custom_open_flash(const char *path, uint8_t type, uint8_t flags) {
     GCN_ALIGNED(file_entry_t) entry;
 
     strncpy(entry.name, path, 256);
@@ -394,9 +394,9 @@ int dvd_custom_open_flash(const char *path, uint8_t type, uint8_t flags) {
         return 1;
     }
     return 0;
-}
+}*/
 
-void dvd_custom_bypass_enter() {
+/*void dvd_custom_bypass_enter() {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -412,9 +412,9 @@ void dvd_custom_bypass_enter() {
         ; // transfer complete register
 
     return;
-}
+}*/
 
-void dvd_custom_bypass_exit() {
+/*void dvd_custom_bypass_exit() {
     _di_regs[DI_SR] = (DI_SR_BRKINTMASK | DI_SR_TCINTMASK | DI_SR_DEINT | DI_SR_DEINTMASK);
     _di_regs[DI_CVR] = 0; // clear cover int
 
@@ -430,9 +430,9 @@ void dvd_custom_bypass_exit() {
         ; // transfer complete register
 
     return;
-}
+}*/
 
-int dvd_custom_presence(bool playing, const char *status, const char *sub_status)
+/*int dvd_custom_presence(bool playing, const char *status, const char *sub_status)
 {
     GCN_ALIGNED(flippydrive_net_presence_t) presence = {};
 
@@ -462,4 +462,4 @@ int dvd_custom_presence(bool playing, const char *status, const char *sub_status
         return 1;
     }
     return 0;
-}
+}*/
