@@ -21,7 +21,7 @@ include $(DEVKITPRO)/libogc2/gamecube_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/picolibc source/pmalloc
+SOURCES		:=	source source/picolibc source/pmalloc source/emu source/emu/ffs
 DATA		:=	data
 INCLUDES	:=	include
 
@@ -35,7 +35,7 @@ endif
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS		= -O2 -Wall -Wno-main -ffixed-r12 -ffixed-r13 -ffunction-sections -fdata-sections -Wno-unused-function -Werror-implicit-function-declaration $(MACHDEP) $(INCLUDE)
+CFLAGS		= -O2 -Wall -Wno-main -ffixed-r12 -ffixed-r13 -ffunction-sections -fdata-sections -Wno-unused-function -Werror-implicit-function-declaration -DIPL_CODE $(MACHDEP) $(INCLUDE)
 CXXFLAGS	= $(CFLAGS)
 
 LINKER_SCRIPTS	:=

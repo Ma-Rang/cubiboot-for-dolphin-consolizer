@@ -115,6 +115,8 @@ $(BUILD): $(CUBEBOOT)
 #---------------------------------------------------------------------------------
 $(CUBEBOOT):
 	@[ -d $(DATA) ] || mkdir -p $(DATA)
+	@rm -rf $(dir $(PROJDIR))/patches/source/emu
+	@cp -r $(dir $(PROJDIR))/cubeboot/source/emu $(dir $(PROJDIR))/patches/source/emu
 	@$(MAKE) --no-print-directory -C $(dir $(PROJDIR))/$(basename $(notdir $@))
 	@gzip -k -v -c $(dir $(PROJDIR))/$(basename $(notdir $@))/cubeboot.dol > $@
 
@@ -123,6 +125,7 @@ clean:
 	@$(MAKE) --no-print-directory -C $(dir $(PROJDIR))/$(basename $(notdir $(CUBEBOOT))) clean
 	@echo clean $(TARGET) ...
 	@rm -fr $(BUILD) $(PROJDIR)/$(DATA) $(OUTPUT).elf $(OUTPUT).dol
+	@rm -rf $(dir $(PROJDIR))/patches/source/emu
 
 #---------------------------------------------------------------------------------
 else

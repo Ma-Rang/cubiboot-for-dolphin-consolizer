@@ -21,7 +21,7 @@ include $(DEVKITPRO)/libogc2/gamecube_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/pngu source/boot
+SOURCES		:=	source source/pngu source/boot source/emu source/emu/ffs
 DATA		:=	data  
 INCLUDES	:=	include
 
