@@ -16,6 +16,11 @@ This is a fork of cubeboot by TeamOffBroadway with support for SD2SP2, SD Gecko 
 4. Download the [latest Swiss](https://github.com/emukidid/swiss-gc/releases/latest) dol
 5. Rename the Swiss dol to ```swiss-gc.dol``` and place it on your SD card
 
+## Known Bugs
+- cube_logo option does not work
+- PicoLoader uf2: holding A during boot enters a partially broken vanilla IPL
+- PicoBoot uf2: does not work
+
 ## Special Thanks
 - [TeamOffBroadway](https://github.com/OffBroadway) for creating cubeboot
 - [Extrems](https://github.com/Extrems), [emukidid](https://github.com/emukidid) and everyone involved in creating Swiss
