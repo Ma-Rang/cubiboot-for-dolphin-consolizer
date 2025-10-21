@@ -1,6 +1,6 @@
 # cubiboot
 
-This is a fork of cubeboot by TeamOffBroadway with support for SD2SP2, SD Gecko or similar SD adapters.
+This is a fork of [cubeboot](https://github.com/OffBroadway/cubeboot) by [TeamOffBroadway](https://github.com/OffBroadway) with support for SD2SP2, SD Gecko or similar SD adapters.
 
 ## Installation - PicoLoader
 1. Download the ```cubiboot_pl.uf2``` file
@@ -18,7 +18,6 @@ This is a fork of cubeboot by TeamOffBroadway with support for SD2SP2, SD Gecko 
 
 ## Known Bugs
 - cube_logo option does not work
-- PicoLoader uf2: holding A during boot enters a partially broken vanilla IPL
 - PicoBoot uf2: does not work
 
 ## Special Thanks
