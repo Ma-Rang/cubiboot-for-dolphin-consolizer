@@ -469,7 +469,7 @@ __attribute_used__ void bs2start() {
     // read boot info into lowmem
     struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
 
-    if (!start_passthrough_game) {
+    if (!start_passthrough_game || force_swiss_boot) {
         gm_deinit_thread();
     } else {
         dvd_custom_bypass_enter();

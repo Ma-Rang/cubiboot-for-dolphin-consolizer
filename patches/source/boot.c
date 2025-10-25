@@ -170,8 +170,9 @@ const int GXPokeARGBPatch_length = 0x18;
 extern const void _patches_end;
 
 void chainload_boot_game(gm_file_entry_t *boot_entry, bool passthrough) {
-    if (!passthrough)
-        chainload_swiss_game(boot_entry->path, false);
+    extern u32 force_swiss_boot;
+    if (!passthrough || force_swiss_boot)
+        chainload_swiss_game(boot_entry == NULL ? NULL : boot_entry->path, passthrough);
 
     u32 patchSize = 0x200; // setup patching space
     u32 topAddr = 0x81800000 - patchSize;
