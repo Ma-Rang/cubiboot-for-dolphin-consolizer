@@ -18,12 +18,18 @@ If you have questions regarding this fork you can join the [Discord server](http
 4. Download the [latest Swiss](https://github.com/emukidid/swiss-gc/releases/latest) dol
 5. Rename the Swiss dol to ```swiss-gc.dol``` and place it on your SD card
 
+## Using In-Game Reset
+1. Download [```EXTRACT_TO_ROOT.zip```](https://github.com/makeo/cubiboot/releases/latest/download/EXTRACT_TO_ROOT.zip)
+2. Extract the contents to the root of the SD card
+3. Pressing Z + B + START whilst in a game brings you back to the cubiboot menu
+
 ## Other ODEs (e.g. GC Loader)
 Download the [```cubiboot.iso```](https://github.com/makeo/cubiboot/releases/latest/download/cubiboot.iso) and use it as appropriate for your ODE.\
 Files and the config have to be stored on a separate SD2SP2, SD Gecko or similar SD adapter.\
 ODEs besides PicoLoader are not supported, and issues specific to these devices might not be fixed.
 
 ## Known Bugs
+- loading of files is slow when changing directories
 - cube_logo option does not work
 - button_* options to not work (use gekkoboot for this functionality instead)
 - no PicoBoot uf2
