@@ -41,4 +41,5 @@ ODEs besides PicoLoader are not supported, and issues specific to these devices 
 ## Acknowledgements
 - [cubeboot](https://github.com/OffBroadway/cubeboot) (GPL-2.0)
 - [apploader](https://github.com/makeo/cubeboot-tools) (GPL-2.0)
+- [packer](https://github.com/emukidid/swiss-gc/tree/master/cube/packer) for apploader.img (GPL-2.0)
 - For more, see [CREDIT.md](https://github.com/makeo/cubiboot/blob/main/CREDIT.md)
