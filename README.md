@@ -29,7 +29,8 @@ Files and the config have to be stored on a separate SD2SP2, SD Gecko or similar
 ODEs besides PicoLoader are not supported, and issues specific to these devices might not be fixed.
 
 ## Known Bugs
-- loading of files is slow when changing directories
+- loading of files is slow when scrolling/changing directories
+- In-game reset causes GameCube to freeze up for some games
 - cube_logo option does not work
 - button_* options to not work (use gekkoboot for this functionality instead)
 - no PicoBoot uf2
