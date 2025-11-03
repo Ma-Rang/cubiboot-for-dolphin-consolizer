@@ -239,6 +239,9 @@ void load_ipl(bool is_running_dolphin) {
     }
 
     post_ipl_loaded();
+
+    extern void apply_additional_patches();
+    apply_additional_patches();
     return;
 }
 

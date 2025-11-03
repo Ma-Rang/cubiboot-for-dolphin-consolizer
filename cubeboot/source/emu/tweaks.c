@@ -152,4 +152,23 @@ void ensure_ipl_loaded(uint8_t* bios_buffer) {
     metadata->code_size = code_end_addr - 0x81300000;
 }
 
+void apply_additional_patches() {
+    extern s8 bios_index;
+    if (bios_index < 0)
+        return;
+
+    // disable exi probe for sd slot
+    const char* dev = emu_get_device(); 
+    if (strcmp(dev, "sda") == 0) {
+        u32 probe_card_0[] = { 0x8131b1c4, 0x8131b8f0, 0x8131bc88, 0x8131bca0, 0x8131c29c, 0x8131b81c, 0x8131c3dc };
+        *(u32*)probe_card_0[bios_index] = 0x38600000; // li r3, 0
+    } else if (strcmp(dev, "sdb") == 0) {
+        u32 probe_card_1[] = { 0x8131b274, 0x8131b9a0, 0x8131bd38, 0x8131bd50, 0x8131c34c, 0x8131b8cc, 0x8131c48c };
+        *(u32*)probe_card_1[bios_index] = 0x38600000; // li r3, 0
+    } else if (strcmp(dev, "sdc") == 0) {
+        u32 init_ad16_addr[] = { 0x81335f54, 0x8135b9b4, 0x8136572c, 0x81365890, 0x8135ef94, 0x8135b8d4, 0x81368c08 };
+        *(u32*)init_ad16_addr[bios_index] = 0x4e800020; // blr
+    }
+}
+
 #endif
