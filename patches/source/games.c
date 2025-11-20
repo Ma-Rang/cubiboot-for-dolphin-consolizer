@@ -580,20 +580,8 @@ void gm_sort_files(int path_count) {
     (void)runtime;
 }
 // returns amount of space used in aram
-static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_unload, bool cached) {
+static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
     if (entry->extra.dvd_bnr_offset == 0) return false;
-
-    if (cached) {
-        entry->asset.banner.state = GM_LOAD_STATE_LOADING;
-        entry->asset.banner.aram_offset = aram_offset;
-        gm_banner_load(&entry->asset.banner);
-
-        while (entry->asset.banner.state == GM_LOAD_STATE_LOADING)
-            OSYieldThread();
-
-        memcpy(&entry->desc, &entry->asset.banner.buf->desc, sizeof(BNRDesc));
-        return true;
-    }
 
     // load the banner
     dvd_custom_open(entry->path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLESPEEDEMU);
@@ -625,7 +613,6 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
 
     // TODO: check current language using extra.dvd_bnr_type
     memcpy(&entry->desc, &banner_buffer.desc[0], sizeof(BNRDesc));
-    memcpy(&entry->asset.banner.buf->desc, &banner_buffer.desc[0], sizeof(BNRDesc));
 
     return true;
 }
@@ -698,7 +685,7 @@ static bool gm_load_icon(gm_file_entry_t *entry, u32 aram_offset, bool force_unl
 
 void gm_check_files(int path_count) {
     // Here we will also check for override assets and matching save icons
-    static u32 aram_offset = (1 * 1024 * 1024); // 1MB mark
+    u32 aram_offset = (1 * 1024 * 1024); // 1MB mark
 
     // Enumerate all of the games
     u64 start_time = gettime();
@@ -743,21 +730,11 @@ void gm_check_files(int path_count) {
             backing->extra.dvd_max_fst_size = info.max_fst_size;
 
             // load the banner
-            u32 cached_aram_offset = 0;
-            if (bnr_cache_get(info.game_id, &cached_aram_offset)) {
-                bool bnr_loaded = gm_load_banner(backing, cached_aram_offset, force_unload, true);
-                if (!bnr_loaded) {
-                    OSReport("Failed to load cached banner %s\n", entry->path);
-                }
-            } else {
-                bool bnr_loaded = gm_load_banner(backing, aram_offset, force_unload, false);
-                if (!bnr_loaded) {
-                    OSReport("Failed to load banner %s\n", entry->path);
-                } else {
-                    bnr_cache_put(info.game_id, aram_offset);
-                }
-                aram_offset += BNR_PIXELDATA_LEN;
+            bool bnr_loaded = gm_load_banner(backing, aram_offset, force_unload);
+            if (!bnr_loaded) {
+                OSReport("Failed to load banner %s\n", entry->path);
             }
+            aram_offset += BNR_PIXELDATA_LEN;
 
             // load the icon
             backing->asset.use_banner = true;
@@ -769,8 +746,8 @@ void gm_check_files(int path_count) {
             // } else {
             //     backing->asset.use_banner = false;
             // }
-            //backing->asset.use_banner = true;
-            //aram_offset += ICON_PIXELDATA_LEN;
+            backing->asset.use_banner = true;
+            aram_offset += ICON_PIXELDATA_LEN;
 
             // set heap pointer
             gm_entry_backing[gm_entry_count] = backing;

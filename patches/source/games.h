@@ -36,7 +36,6 @@ typedef struct {
     u32 used;
     u32 padding[7];
     u8 data[BNR_PIXELDATA_LEN];
-    BNRDesc desc;
 } gm_banner_buf_t __attribute__((aligned(32)));
 #pragma pack(pop)
 
