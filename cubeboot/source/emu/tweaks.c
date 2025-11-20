@@ -14,6 +14,9 @@
 #else
 #include "../gc_dvd.h"
 #include "../time.h"
+#include "../attr.h"
+#include "../dolphin_arq.h"
+#include "../usbgecko.h"
 #endif
 
 
@@ -64,6 +67,50 @@ bool emu_has_dvd() {
 }
 
 
+static volatile bool bnr_store_bsy = false;
+static void bnr_cache_store_cb(u32 arq_request_ptr) {
+    bnr_store_bsy = false;
+}
+
+void bnr_cache_store(BNR* bnr, u32 aram_offset) {
+    custom_OSReport("Store banner at: 0x%x\n", aram_offset);
+    static ARQRequest req;
+    u32 owner = make_type('I', 'X', 'X', 'S');
+    u32 type = ARAM_DIR_MRAM_TO_ARAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = (u32)bnr;
+    u32 dest = aram_offset;
+    u32 length = sizeof(BNR);
+
+    bnr_store_bsy = true;
+    DCFlushRange(bnr, sizeof(BNR));
+    dolphin_ARQPostRequest(&req, owner, type, priority, source, dest, length, &bnr_cache_store_cb);
+    while (bnr_store_bsy)
+        OSYieldThread();
+}
+
+static volatile bool bnr_load_bsy = false;
+static void bnr_cache_load_cb(u32 arq_request_ptr) {
+    bnr_load_bsy = false;
+}
+
+void bnr_cache_load(BNR* bnr, u32 aram_offset) {
+    custom_OSReport("Load banner from: 0x%x\n", aram_offset);
+    static ARQRequest req;
+    u32 owner = make_type('I', 'X', 'X', 'L');
+    u32 type = ARAM_DIR_ARAM_TO_MRAM;
+    u32 priority = ARQ_PRIORITY_LOW;
+    u32 source = aram_offset;
+    u32 dest = (u32)bnr;
+    u32 length = sizeof(BNR);
+
+    bnr_load_bsy = true;
+    dolphin_ARQPostRequest(&req, owner, type, priority, source, dest, length, &bnr_cache_load_cb);
+    while (bnr_load_bsy)
+        OSYieldThread();
+    DCFlushRange(bnr, sizeof(BNR));
+}
+
 #define BNR_CACHE_SIZE 1024
 
 typedef struct {
@@ -75,14 +122,10 @@ typedef struct {
 static bnr_cache_entry_t bnr_cache[BNR_CACHE_SIZE] = {0};
 static u32 bnr_cache_next_index = 0;
 
-bool bnr_cache_get(u8 game_id[6], u32* aram_offset) {
-    if (!game_id || !aram_offset) {
-        return false;
-    }
-    
+bool bnr_cache_get(u8 game_id[6], BNR* bnr) {
     for (int i = 0; i < BNR_CACHE_SIZE; i++) {
         if (bnr_cache[i].valid && memcmp(bnr_cache[i].game_id, game_id, 6) == 0) {
-            *aram_offset = bnr_cache[i].aram_offset;
+            bnr_cache_load(bnr, bnr_cache[i].aram_offset);
             return true;
         }
     }
@@ -90,21 +133,19 @@ bool bnr_cache_get(u8 game_id[6], u32* aram_offset) {
     return false;
 }
 
-void bnr_cache_put(u8 game_id[6], u32 aram_offset) {
-    if (!game_id) {
-        return;
-    }
-    
+void bnr_cache_put(u8 game_id[6], BNR* bnr) {
     for (int i = 0; i < BNR_CACHE_SIZE; i++) {
         if (bnr_cache[i].valid && memcmp(bnr_cache[i].game_id, game_id, 6) == 0) {
-            bnr_cache[i].aram_offset = aram_offset;
             return;
         }
     }
-    
-    bnr_cache[bnr_cache_next_index].valid = true;
-    memcpy(bnr_cache[bnr_cache_next_index].game_id, game_id, 6);
-    bnr_cache[bnr_cache_next_index].aram_offset = aram_offset;
+
+    bnr_cache_entry_t* entry = &bnr_cache[bnr_cache_next_index];
+    entry->valid = false;
+    memcpy(entry->game_id, game_id, 6);
+    entry->aram_offset = (16 * 1024 * 1024) - (sizeof(BNR) * (bnr_cache_next_index + 1));
+    bnr_cache_store(bnr, entry->aram_offset);
+    entry->valid = true;
     
     bnr_cache_next_index = (bnr_cache_next_index + 1) % BNR_CACHE_SIZE;
 }

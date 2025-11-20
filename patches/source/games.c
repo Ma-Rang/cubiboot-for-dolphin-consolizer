@@ -583,6 +583,10 @@ void gm_sort_files(int path_count) {
 static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_unload) {
     if (entry->extra.dvd_bnr_offset == 0) return false;
 
+    __attribute_aligned_data_lowmem__ static BNR banner_buffer;
+    if (bnr_cache_get(entry->extra.game_id, &banner_buffer))
+        goto cached;
+
     // load the banner
     dvd_custom_open(entry->path, FILE_ENTRY_TYPE_FILE, IPC_FILE_FLAG_DISABLECACHE | IPC_FILE_FLAG_DISABLESPEEDEMU);
     file_status_t *status = dvd_custom_status();
@@ -591,9 +595,12 @@ static int gm_load_banner(gm_file_entry_t *entry, u32 aram_offset, bool force_un
         return false;
     }
 
-    __attribute_aligned_data_lowmem__ static BNR banner_buffer;
+    //__attribute_aligned_data_lowmem__ static BNR banner_buffer;
     dvd_threaded_read(&banner_buffer, sizeof(BNR), entry->extra.dvd_bnr_offset, status->fd);
     dvd_custom_close(status->fd);
+
+    bnr_cache_put(entry->extra.game_id, &banner_buffer);
+    cached:
 
     entry->asset.banner.state = GM_LOAD_STATE_LOADING;
     gm_banner_buf_t *banner_ptr = gm_get_banner_buf();
@@ -946,6 +953,49 @@ void *gm_thread_worker(void* param) {
     if (target == NULL || strlen(target) == 0) {
         OSReport("ERROR: target is NULL\n");
         return NULL;
+    }
+
+    static bool fill_cache = true;
+    if (fill_cache) {
+        fill_cache = false;
+        
+        char path_stack[100][128];
+        int path_count = 1;
+        strcpy(path_stack[0], "/");
+
+        while (path_count > 0) {
+            char* cur = path_stack[--path_count];
+            gm_list_info list_info = gm_list_files(cur);
+            gm_sort_files(list_info.num_paths);
+            gm_check_files(list_info.num_paths);
+            if (gm_entry_count > 0) {
+                for (int i = 0; i < gm_entry_count; i++) {
+                    gm_file_entry_t *entry = gm_entry_backing[i];
+                    if (entry->type == GM_FILE_TYPE_GAME) {
+                        gm_icon_free(&entry->asset.icon);
+                        gm_banner_free(&entry->asset.banner);
+                    } else {
+                        gm_icon_free(&entry->asset.icon);
+                    }
+                    gm_free(entry);
+                }
+                gm_entry_count = 0;
+            }
+
+            for (int i = 0; i < list_info.num_paths; i++) {
+                gm_path_entry_t* entry = __gm_sorted_path_list[i];
+
+                if (entry->type == GM_FILE_TYPE_DIRECTORY) {
+                    char subdir_path[128];
+                    strcpy(subdir_path, entry->path);
+                    strcat(subdir_path, "/");
+
+                    if (path_count < 100) {
+                        strcpy(path_stack[path_count++], subdir_path);
+                    }
+                }
+            }
+        }
     }
 
     gm_list_info list_info = gm_list_files(target);
