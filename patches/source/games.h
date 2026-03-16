@@ -57,7 +57,12 @@ typedef struct {
 
 typedef struct {
     bool use_banner;
+    bool has_save_icon;         // true if save_icon contains valid memory card icon
+    u8   save_icon_frame_count; // number of animation frames (1-8)
+    u16  save_icon_speed;       // GCI iconSpeed (2 bits per frame timing)
+    const u8 *save_icon_blob;   // pointer to all frames in game blob (NULL if none)
     gm_icon_t icon;
+    gm_icon_t save_icon;        // frame 0 in ARAM/buffer (preferred on cube grid)
     gm_banner_t banner;
 } gm_asset_t;
 

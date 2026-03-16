@@ -15,14 +15,11 @@
 #include "menu.h"
 
 #include "dolphin_arq.h"
-#include "flippy_sync.h"
-#include "gc_dvd.h"
 #include "games.h"
 
 #include "video.h"
-#include "dol.h"
-#include "boot.h"
-#include "gameid.h"
+
+#include "gecko_link.h"
 
 #define CUBE_TEX_WIDTH 84
 #define CUBE_TEX_HEIGHT 84
@@ -44,7 +41,8 @@ __attribute_data__ u32 cube_color = 0;
 __attribute_data__ u32 start_passthrough_game = 0;
 
 __attribute_data__ static u8 *cube_text_tex = NULL;
-__attribute_data__ char cube_logo_path[MAX_FILE_NAME] = {0};
+// cube_logo_path only used by load_cube_logo() which is #if 0
+// __attribute_data__ char cube_logo_path[MAX_FILE_NAME] = {0};
 __attribute_data__ u32 force_progressive = 0;
 __attribute_data__ u32 force_swiss_boot = 0;
 
@@ -361,10 +359,6 @@ __attribute_used__ void pre_thread_init() {
 __attribute_used__ void pre_menu_init(int unk) {
     menu_init(unk);
 
-    // change default menu
-    *prev_menu_id = MENU_GAMESELECT_TRANSITION_ID;
-    *cur_menu_id = MENU_GAMESELECT_ID;
-
     custom_gameselect_init();
 
     mod_cube_colors();
@@ -466,78 +460,19 @@ __attribute_used__ u32 bs2tick() {
 __attribute_used__ void bs2start() {
     OSReport("DONE\n");
 
-    // read boot info into lowmem
-    struct dolphin_lowmem *lowmem = (struct dolphin_lowmem*)0x80000000;
+    gm_deinit_thread();
 
-    if (!start_passthrough_game || force_swiss_boot) {
-        gm_deinit_thread();
-    } else {
-        dvd_custom_bypass_enter();
-        udelay(10 * 1000);
+    // Send LAUNCH command to Helper via USB Gecko.
+    // Helper will tell Dolphin to BOOT the selected game via IPC,
+    // which terminates this emulation session.
+    OSReport("Launching game index %d\n", selected_slot);
+    gecko_link_launch((u16)selected_slot);
 
-        int ret = dvd_read_id();
-        int err = dvd_get_error();
-        if (ret != 0 || err != 0) {
-            custom_OSReport("Failed to read disc ID\n");
-            dvd_custom_bypass_exit();
-            udelay(10 * 1000);
-
-            load_stub(); // exit to loader again
-            u32 *sig = (u32*)0x80001804;
-            if ((*sig++ == 0x53545542 || *sig++ == 0x53545542) && *sig == 0x48415858) {
-                static void (*reload)(void) = (void(*)(void))0x80001800;
-                run(reload);
-            }
-        }
-
-        custom_OSReport("Game ID: %c%c%c%c\n", lowmem->b_disk_info.game_code[0], lowmem->b_disk_info.game_code[1], lowmem->b_disk_info.game_code[2], lowmem->b_disk_info.game_code[3]);
-        dvd_audio_config(lowmem->b_disk_info.audio_streaming, lowmem->b_disk_info.stream_buffer_size);
-
-        char diskName[64] = "DISC GAME\0";
-        setup_gameid_commands(&lowmem->b_disk_info, diskName);
-    }
-
-    // no IPL code should be running after this point
-
-    extern void tsd_set_native(bool native);
-    tsd_set_native(true);
-
-    while (!PADSync());
-    OSDisableInterrupts();
-    __OSStopAudioSystem();
-
-    u32 start_addr = 0x80100000;
-    u32 end_addr = 0x81600000;
-    u32 len = end_addr - start_addr;
-
-    memset((void*)start_addr, 0, len); // cleanup
-    DCFlushRange((void*)start_addr, len);
-    ICInvalidateRange((void*)start_addr, len);
-
-    // Passthrough mode
-    if (start_passthrough_game) {
-        chainload_boot_game(NULL, true);
-    }
-
-    char *boot_path = boot_entry.path;
-    if (boot_entry.type == GM_FILE_TYPE_PROGRAM) {
-        custom_OSReport("Booting DOL\n");
-        load_stub();
-
-        chainload_swiss_game(boot_path, false); // use swiss as normal dol load is partially broken
-        //dol_info_t info = load_dol_file(boot_path, false);
-        //run(info.entrypoint);
-    } else {
-        custom_OSReport("Booting ISO\n");
-
-        if (!force_swiss_boot) {
-            custom_OSReport("Booting ISO (custom apploader)\n");
-            chainload_boot_game(&boot_entry, false);
-        } else {
-            custom_OSReport("Booting ISO (swiss chainload)\n");
-            chainload_swiss_game(boot_path, false);
-        }
-    }
+    // Spin forever — Dolphin will kill emulation to boot the game.
+    // The user sees the IPL UI frozen for a brief moment before the
+    // game takes over.
+    while (1)
+        ;
 
     __builtin_unreachable();
 }

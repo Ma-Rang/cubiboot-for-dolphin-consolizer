@@ -12,14 +12,10 @@
 #include "menu.h"
 #include "grid.h"
 #include "games.h"
-#include "gameid.h"
-
-#include "dolphin_dvd.h"
 
 #include "dir_tex_bin.h"
 #include "dol_tex_bin.h"
 #include "font.h"
-#include "boot.h"
 #include "ipl.h"
 #include "os.h"
 
@@ -30,7 +26,7 @@
 #include "gcm.h"
 #include "bnr.h"
 
-#include "emu/tweaks.h"
+// emu/tweaks.h removed — emu_can_boot not needed (Helper handles bootability)
 
 // for setup
 __attribute_reloc__ void (*menu_alpha_setup)();
@@ -164,6 +160,31 @@ void draw_text(char *s, s16 size, u16 x, u16 y, GXColor *color) {
 }
 
 __attribute_data__ u16 anim_step = 0;
+__attribute_data__ u32 icon_anim_tick = 0;
+
+// Calculate which animation frame to display based on iconSpeed timing.
+// iconSpeed: 2 bits per frame (frames 0-7), speed values:
+//   0 = no icon, 1 = 4 vblanks, 2 = 8 vblanks, 3 = 12 vblanks
+static int get_save_icon_frame(u8 frame_count, u16 icon_speed, u32 tick) {
+    if (frame_count <= 1) return 0;
+
+    // Calculate total cycle length in vblanks
+    u32 cycle_len = 0;
+    u32 frame_starts[ICON_MAX_FRAMES];
+    for (int i = 0; i < frame_count; i++) {
+        frame_starts[i] = cycle_len;
+        int speed = (icon_speed >> (i * 2)) & 0x03;
+        if (speed == 0) break;
+        cycle_len += speed * 4;  // speed * 4 vblanks
+    }
+    if (cycle_len == 0) return 0;
+
+    u32 pos = tick % cycle_len;
+    for (int i = frame_count - 1; i >= 0; i--) {
+        if (pos >= frame_starts[i]) return i;
+    }
+    return 0;
+}
 
 __attribute_data__ GXColorS10 *menu_color_icon;
 __attribute_data__ GXColorS10 *menu_color_icon_sel;
@@ -232,7 +253,7 @@ __attribute_used__ void custom_gameselect_init() {
     // }
 
     // colors
-    u32 color_num = SAVE_COLOR_PURPLE; // TODO: make a setting for this
+    u32 color_num = SAVE_COLOR_BLUE;
     u32 color_index = 1 << (10 + 3 + color_num);
     menu_color_icon = get_save_color(color_index, SAVE_ICON);
     menu_color_icon_sel = get_save_color(color_index, SAVE_ICON_SEL);
@@ -317,6 +338,8 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
     if (entry != NULL) {
         if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
             has_texture = true;
+        } else if (entry->asset.has_save_icon && entry->asset.save_icon.state == GM_LOAD_STATE_LOADED) {
+            has_texture = true;
         } else if (entry->asset.use_banner && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
             has_texture = true;
         } else if (entry->asset.icon.state == GM_LOAD_STATE_LOADED) {
@@ -353,9 +376,27 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
         draw_partial(m, &m->data->parts[2]);
         draw_partial(m, &m->data->parts[10]);
 
-        // icon
+        // icon — prefer save icon > disc icon > banner
         tex_data *icon_tex = &m->data->tex->dat[1];
-        if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY || entry->asset.icon.state != GM_LOAD_STATE_NONE) {
+        if (entry->asset.has_save_icon && entry->asset.save_icon.state == GM_LOAD_STATE_LOADED) {
+            // Memory card save icon (32x32) — animated if multiple frames
+            u32 target_texture_data;
+            if (entry->asset.save_icon_frame_count > 1 && entry->asset.save_icon_blob != NULL) {
+                // Animated: read current frame directly from blob in RAM
+                int frame = get_save_icon_frame(
+                    entry->asset.save_icon_frame_count,
+                    entry->asset.save_icon_speed,
+                    icon_anim_tick);
+                target_texture_data = (u32)(entry->asset.save_icon_blob + frame * ICON_PIXELDATA_LEN);
+            } else {
+                // Static: use the ARAM-backed buffer (frame 0)
+                target_texture_data = (u32)entry->asset.save_icon.buf->data;
+            }
+            icon_tex->offset = (s32)(target_texture_data - (u32)icon_tex);
+            icon_tex->format = GX_TF_RGB5A3;
+            icon_tex->width = 32;
+            icon_tex->height = 32;
+        } else if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY || entry->asset.icon.state != GM_LOAD_STATE_NONE) {
             u32 target_texture_data = 0;
             if (entry->asset.icon.state == GM_LOAD_STATE_NONE) {
                 const uint8_t *default_icon = entry->type == GM_FILE_TYPE_DIRECTORY ? &dir_tex_bin[0] : &dol_tex_bin[0];
@@ -364,8 +405,7 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
                 target_texture_data = (u32)entry->asset.icon.buf->data;
             }
 
-            s32 desired_offset = (s32)((u32)target_texture_data - (u32)icon_tex);
-            icon_tex->offset = desired_offset;
+            icon_tex->offset = (s32)(target_texture_data - (u32)icon_tex);
             icon_tex->format = GX_TF_RGB5A3;
             icon_tex->width = 32;
             icon_tex->height = 32;
@@ -373,8 +413,7 @@ __attribute_used__ void draw_save_icon(position_t *pos, u32 slot_num, u8 alpha, 
             u16 *source_texture_data = (u16*)entry->asset.banner.buf->data;
             u32 target_texture_data = (u32)source_texture_data;
 
-            s32 desired_offset = (s32)((u32)target_texture_data - (u32)icon_tex);
-            icon_tex->offset = desired_offset;
+            icon_tex->offset = (s32)(target_texture_data - (u32)icon_tex);
             icon_tex->format = GX_TF_RGB5A3;
             icon_tex->width = 96;
             icon_tex->height = 32;
@@ -481,7 +520,7 @@ void setup_icon_positions() {
         pos->opacity = 1.0;
 
 
-        f32 pos_x = base_x + (col * DRAW_OFFSET_Y);
+        f32 pos_x = base_x + (col * DRAW_OFFSET_X);
 #if defined(WITH_SPACE) && WITH_SPACE
         if (col >= 4) pos_x += 24; // card spacing
 #endif
@@ -494,6 +533,7 @@ void setup_icon_positions() {
 }
 
 __attribute_used__ void update_icon_positions() {
+    icon_anim_tick++;
     f32 mult = 0.7; // 1.0 is more accurate
     selected_icon_mod.rot_diff_x = fast_cos(anim_step * 70) * 350 * mult;
     selected_icon_mod.rot_diff_y = fast_cos(anim_step * 35 - 15000) * 1000 * mult;
@@ -527,8 +567,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     GXColor white = {0xFF, 0xFF, 0xFF, ui_alpha};
 
     // text
-    draw_text("cubiboot loader", 20, 20, 4, &white);
-    draw_text("Load Disc (Z)", 20, 320, 4, &white);
+    (void)white;
 
     // icons
     for (int pass = 0; pass < 2; pass++) {
@@ -586,7 +625,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
     }
 
     // box
-    GXColor top_color = {0x6e, 0x00, 0xb3, 0xc8};
+    GXColor top_color = {0x00, 0x00, 0xd0, 0xc8};
     GXColor bottom_color = {0x80, 0x00, 0x57, 0xb4};
     draw_info_box(0x20f0, 0x560, 0x1230, 0x1640, ui_alpha, &top_color, &bottom_color);
 
@@ -597,7 +636,7 @@ __attribute_used__ void custom_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, u8
 
         // info
         draw_blob_text(make_type('t','i','t','l'), menu_blob, &white, entry->desc.fullGameName, 0x1f);
-        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, entry->desc.description, 0x1f);
+        draw_blob_text(make_type('i','n','f','o'), menu_blob, &white, entry->desc.gameName, 0x1f);
 
         switch_lang_eng();
         if (entry->type == GM_FILE_TYPE_PROGRAM || entry->type == GM_FILE_TYPE_DIRECTORY) {
@@ -650,9 +689,7 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     if (entry->extra.game_id[3] == 'J') switch_lang_jpn();
     else switch_lang_eng();
 
-    bool can_boot = emu_can_boot(entry->type);
-    if (!can_boot)
-        emu_draw_boot_error(entry->type, alpha_1);
+    // All games are bootable via Helper — no emu_can_boot check needed
 
     if (entry->type == GM_FILE_TYPE_GAME && entry->asset.banner.state == GM_LOAD_STATE_LOADED) {
         // game banner
@@ -672,49 +709,80 @@ __attribute_used__ void original_gameselect_menu(u8 broken_alpha_0, u8 alpha_1, 
     }
 
     // press start anim
-    if (can_boot)
-        draw_start_anim(ui_alpha); // TODO: fix alpha timing
+    // All games bootable via Helper
+    draw_start_anim(ui_alpha); // TODO: fix alpha timing
 
     // fix camera again
     setup_gameselect_menu(0, 0, 0);
 
     // start string
     switch_lang_orig();
-    if (can_boot)
-        draw_blob_fixed(game_blob_text, game_blob_a, game_blob_b, &white);
+    draw_blob_fixed(game_blob_text, game_blob_a, game_blob_b, &white);
 
     return;
 }
 
 static bool first_transition = true;
 static bool in_submenu_transition = false;
+static bool exit_to_main_menu = false;
+static u8 exit_fade_alpha = 0xFF;
 static u8 custom_menu_transition_alpha = 0xFF;
 static u8 original_menu_transition_alpha = 0;
+static u32 dbg_last_cur = 99, dbg_last_prev = 99;
 __attribute_used__ void pre_menu_alpha_setup() {
-    menu_alpha_setup(); // run original function
+    if (*cur_menu_id != dbg_last_cur || *prev_menu_id != dbg_last_prev) {
+        OSReport("alpha_setup: cur=%d prev=%d exit=%d\n", *cur_menu_id, *prev_menu_id, (int)exit_to_main_menu);
+        dbg_last_cur = *cur_menu_id;
+        dbg_last_prev = *prev_menu_id;
+    }
 
-    if (*cur_menu_id == MENU_GAMESELECT_ID && *prev_menu_id == MENU_GAMESELECT_TRANSITION_ID) {
-        OSReport("Resetting back to SUBMENU_GAMESELECT_LOADER\n");
+    menu_alpha_setup();
+
+    if (*cur_menu_id != dbg_last_cur || *prev_menu_id != dbg_last_prev) {
+        OSReport("after menu_alpha_setup: cur=%d prev=%d exit=%d\n", *cur_menu_id, *prev_menu_id, (int)exit_to_main_menu);
+        dbg_last_cur = *cur_menu_id;
+        dbg_last_prev = *prev_menu_id;
+    }
+
+    // Clear exit flag once IPL has settled at main menu
+    if (exit_to_main_menu && *cur_menu_id == MENU_SELECTION_ID && *prev_menu_id == MENU_SELECTION_ID) {
+        exit_to_main_menu = false;
+    }
+
+    // Detect entry into game select and skip menu 1 (press A prompt) — go straight to menu 2 (grid).
+    if (*cur_menu_id == MENU_GAMESELECT_ID && first_transition && !exit_to_main_menu) {
+        OSReport("Entering game select — skipping to grid\n");
         current_gameselect_state = SUBMENU_GAMESELECT_LOADER;
+        *cur_menu_id = MENU_GAMESELECT_TRANSITION_ID;
+        *prev_menu_id = MENU_GAMESELECT_TRANSITION_ID;
+        exit_fade_alpha = 0xFF; // reset fade for re-entry
+        first_transition = false;
+    }
 
-        if (first_transition) {
-            Jac_PlaySe(SOUND_MENU_ENTER);
-            first_transition = false;
-        }
+    // Reset so re-entry works after returning to main menu.
+    if (*cur_menu_id != MENU_GAMESELECT_ID) {
+        first_transition = true;
     }
 }
 
 __attribute_used__ void mod_gameselect_draw(u8 alpha_0, u8 alpha_1, u8 alpha_2) {
     // this is for the camera
     setup_gameselect_menu(0, 0, 0);
-    draw_grid(global_gameselect_matrix, alpha_1);
+
+    // Apply exit fade (stays black until re-entry resets exit_fade_alpha)
+    u8 effective_alpha = alpha_1;
+    if (exit_fade_alpha < effective_alpha) {
+        effective_alpha = exit_fade_alpha;
+    }
+
+    draw_grid(global_gameselect_matrix, effective_alpha);
 
     // TODO: use GXColor instead of alpha byte
     u8 custom_alpha_1 = custom_menu_transition_alpha;
     u8 original_alpha_1 = original_menu_transition_alpha;
 
-    if (alpha_1 != 0xFF) {
-        custom_alpha_1 = alpha_1;
+    if (effective_alpha != 0xFF) {
+        custom_alpha_1 = effective_alpha;
     }
 
     if (custom_alpha_1 != 0) custom_gameselect_menu(alpha_0, custom_alpha_1, alpha_2);
@@ -757,7 +825,8 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     }
 
     if (pad_status->buttons_down & PAD_TRIGGER_Z) {
-        if (emu_has_dvd()) {
+        // Disc passthrough removed — no emu_has_dvd() needed
+        if (0) {
             Jac_StopSoundAll();
             Jac_PlaySe(SOUND_MENU_FINAL);
 
@@ -781,46 +850,20 @@ __attribute_used__ s32 handle_gameselect_inputs() {
             current_gameselect_state = SUBMENU_GAMESELECT_LOADER;
             Jac_PlaySe(SOUND_SUBMENU_EXIT);
         } else if (!in_submenu_transition) {
-            // TODO: check current path depth
-            if (strcmp(game_enum_path, "/") != 0) {
-                gm_deinit_thread();
-                Jac_PlaySe(SOUND_MENU_EXIT);
-                gm_start_thread("..");
-            } else {
-                anim_step = 0; // anim reset
-                *banner_pointer = (u32)&default_opening_bin[0]; // banner reset
-                Jac_PlaySe(SOUND_MENU_EXIT);
-                return MENU_GAMESELECT_ID;
-            }
+            Jac_PlaySe(SOUND_MENU_EXIT);
+            exit_to_main_menu = true;
+            exit_fade_alpha = 0xFF;
         }
     }
 
     if (pad_status->buttons_down & PAD_BUTTON_A && current_gameselect_state == SUBMENU_GAMESELECT_LOADER) {
         if (selected_slot < game_backing_count && !in_submenu_transition) {
-            gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
-            if (entry->type == GM_FILE_TYPE_DIRECTORY) {
-                OSReport("Selected DIR slot: %d (%p)\n", selected_slot, entry);
+            in_submenu_transition = true;
+            current_gameselect_state = SUBMENU_GAMESELECT_START;
 
-                gm_deinit_thread();
-                Jac_PlaySe(SOUND_SUBMENU_ENTER);
-
-                char path[128];
-                sprintf(path, "%s/", entry->path);
-                gm_start_thread(path);
-            } else {
-                in_submenu_transition = true;
-                current_gameselect_state = SUBMENU_GAMESELECT_START;
-
-                Jac_PlaySe(SOUND_SUBMENU_ENTER);
-                setup_gameselect_anim();
-                setup_cube_anim();
-
-                if (entry->type == GM_FILE_TYPE_GAME) {
-                    mcp_set_gameid(entry);
-                }
-
-                // OSReport("Selected slot: %d (%p)\n", selected_slot, asset);
-            }
+            Jac_PlaySe(SOUND_SUBMENU_ENTER);
+            setup_gameselect_anim();
+            setup_cube_anim();
         }
     }
 
@@ -831,16 +874,8 @@ __attribute_used__ s32 handle_gameselect_inputs() {
     if (pad_status->buttons_down & PAD_BUTTON_START && current_gameselect_state == SUBMENU_GAMESELECT_START) {
         Jac_StopSoundAll();
         Jac_PlaySe(SOUND_MENU_FINAL);
-        gm_file_entry_t *entry = gm_get_game_entry(selected_slot);
 
-        if (!emu_can_boot(entry->type))
-            return MENU_GAMESELECT_TRANSITION_ID;
-
-        memcpy(&boot_entry, entry, sizeof(gm_file_entry_t));
-        if (boot_entry.second != NULL) {
-            memcpy(&second_boot_entry, boot_entry.second, sizeof(gm_file_entry_t));
-            boot_entry.second = &second_boot_entry;
-        }
+        // All games bootable via Helper — just signal ready
         *bs2start_ready = 1;
     }
 
@@ -907,15 +942,26 @@ __attribute_used__ s32 handle_gameselect_inputs() {
         }
     }
 
+    // Fade to black before returning to main menu
+    if (exit_to_main_menu) {
+        u8 fade_step = 18;
+        if (exit_fade_alpha <= fade_step) {
+            exit_fade_alpha = 0;
+            anim_step = 0;
+            *banner_pointer = (u32)&default_opening_bin[0];
+            in_submenu_transition = false;
+            first_transition = true;
+            return MENU_SELECTION_ID;
+        }
+        exit_fade_alpha -= fade_step;
+        return MENU_GAMESELECT_TRANSITION_ID;
+    }
+
     return MENU_GAMESELECT_TRANSITION_ID;
 }
 
-__attribute_data__ u8 show_watermark = 1;
+__attribute_data__ u8 show_watermark = 0;
 void alpha_watermark(void) {
-    if (!show_watermark && !is_running_dolphin) return;
-    prep_text_mode();
-
-    GXColor yellow_alpha = {0xFF, 0xFF, 0x00, 0x80};
-    draw_text("BETA TEST", 24, 330, 0, &yellow_alpha);
-    draw_text("cubeboot rc" CONFIG_BETA_RC, 22, 330, 28, &yellow_alpha);
+    // Watermark disabled for Dolphin Launcher builds.
+    (void)show_watermark;
 }

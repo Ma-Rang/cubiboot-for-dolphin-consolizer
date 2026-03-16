@@ -186,31 +186,20 @@ s32 usb_WriteUARTN(const void *buf, u32 len)
 
 #ifdef DEBUG
 
-// #define PRINT_TIMESTAMPS
+#include "gecko_link.h"
 
-u64 first_print = 0;
 void custom_OSReport(const char *fmt, ...) {
-    if (first_print == 0) {
-        first_print = gettime();
-    }
-
     va_list args;
-#ifdef PRINT_TIMESTAMPS
-    static char line[240];
-#endif
     static char buf[256];
 
     va_start(args, fmt);
-#ifndef PRINT_TIMESTAMPS
     int length = vsnprintf((char *)buf, sizeof(buf), (char *)fmt, args);
-#else
-    int length = vsnprintf((char *)line, sizeof(line), (char *)fmt, args);
-    length = sprintf(buf, "(%f): %s", (f32)diff_usec(first_print, gettime()) / 1000.0, line);
-#endif
-
-    custom_WriteUARTN(buf, length);
-
     va_end(args);
+
+    if (length <= 0) return;
+    if (length > 256) length = 256;
+
+    gecko_link_debug(buf, (u16)length);
 }
 
 #else

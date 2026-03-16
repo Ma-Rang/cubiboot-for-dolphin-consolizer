@@ -42,6 +42,15 @@ s32 MCP_ProbeEx(s32 chan)
 	return CARDProbe(chan);
 }
 
+// Hide USB Gecko in slot B from the IPL's memory card check.
+// Without this, the IPL sees an unknown device and reports "corrupt".
+#define CARD_ERROR_NOCARD -3
+__attribute_used__ s32 patched_CARDProbe(s32 chan)
+{
+	if (chan == 1) return CARD_ERROR_NOCARD;
+	return CARDProbe(chan);
+}
+
 s32 MCP_GetDeviceID(s32 chan, u32 *id)
 {
 	bool err = false;

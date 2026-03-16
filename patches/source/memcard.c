@@ -29,6 +29,13 @@ typedef struct CARDDir {
     u32 commentAddr;                // offset 0x3C, size 0x4
 } CARDDir;
 
+// Stub for patch.s hook — originally set Flippy MCP game ID on card thread message.
+// Without Flippy, just pass through to OSSendMessage.
+#include "dolphin_os.h"
+BOOL pre_custom_card_OSSendMessage(OSMessageQueue* mq, OSMessage msg, s32 flags) {
+    return OSSendMessage(mq, msg, flags);
+}
+
 __attribute_reloc__ s32 (*__CARDGetStatusEx)(s32 chan, s32 fileNo, CARDDir* dirent);
 __attribute_reloc__ char* (*get_card_info)(s32 chan, s32 fileNo);
 __attribute_reloc__ void (*draw_card_info)(char unk);

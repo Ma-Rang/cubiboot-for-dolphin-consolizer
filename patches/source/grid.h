@@ -12,6 +12,7 @@
 #define DRAW_BOUND_TOP 104
 #define DRAW_BOUND_BOTTOM 328
 
+#define DRAW_OFFSET_X 56
 #define DRAW_OFFSET_Y 56
 #define DRAW_TOTAL_ROWS 4
 

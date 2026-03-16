@@ -175,7 +175,75 @@ void load_ipl_file() {
     }
 }
 
+// Try loading IPL from embedded DOL data section (placed by Helper)
+static bool load_ipl_embedded() {
+    embedded_ipl_hdr_t *ehdr = (embedded_ipl_hdr_t*)EMBEDDED_IPL_ADDR;
+
+    if (ehdr->magic != EMBEDDED_IPL_MAGIC) {
+        return false;
+    }
+
+    if (ehdr->ipl_size != IPL_SIZE) {
+        iprintf("Embedded IPL wrong size: %x (expected %x)\n", ehdr->ipl_size, IPL_SIZE);
+        return false;
+    }
+
+    iprintf("Found embedded IPL at %08x\n", EMBEDDED_IPL_ADDR);
+
+    // Copy from embedded data section to working buffer
+    u8 *ipl_data = (u8*)EMBEDDED_IPL_ADDR + EMBEDDED_IPL_DATA_OFFSET;
+    memcpy(bios_buffer, ipl_data, IPL_SIZE);
+
+    // Descramble and copy to BS2 destination
+    Descrambler(bios_buffer + DECRYPT_START, IPL_ROM_FONT_SJIS - DECRYPT_START);
+    memcpy(bs2, bios_buffer + BS2_CODE_OFFSET, bs2_size);
+
+    // Validate CRC + SDA
+    u32 sda = get_sda_address();
+    u32 crc = csp_crc32_memory(bs2, bs2_size);
+    iprintf("Embedded IPL sda=%08x crc=%08x\n", sda, crc);
+
+    valid = false;
+    for (int i = 0; i < sizeof(bios_table) / sizeof(bios_table[0]); i++) {
+        if (bios_table[i].dirty_crc == crc && bios_table[i].sda == sda) {
+            bios_index = i;
+            valid = true;
+            break;
+        }
+    }
+
+    if (!valid) {
+        // Try SDA-only match (user may have a different dump)
+        for (int i = 0; i < sizeof(bios_table) / sizeof(bios_table[0]); i++) {
+            if (bios_table[i].sda == sda) {
+                bios_index = i;
+                valid = true;
+                iprintf("WARNING: CRC mismatch, matched by SDA only (%s)\n", bios_table[i].name);
+                break;
+            }
+        }
+    }
+
+    if (!valid) {
+        iprintf("Embedded IPL: no matching version found\n");
+        prog_halt("Bad embedded IPL image\n");
+    }
+
+    return true;
+}
+
 void load_ipl(bool is_running_dolphin) {
+    // Try embedded IPL first (Helper concatenated it to the DOL)
+    if (load_ipl_embedded()) {
+        iprintf("Using embedded IPL\n");
+        post_ipl_loaded();
+        extern void apply_additional_patches();
+        apply_additional_patches();
+        return;
+    }
+
+    iprintf("No embedded IPL, using standard load path\n");
+
     ipl_metadata_t *blob_metadata = (void*)0x81500000 - sizeof(ipl_metadata_t);
 
     iprintf("ORIG Metadata:\n");
