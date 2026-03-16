@@ -57,8 +57,10 @@ extern const void _end;
 void *xfb;
 GXRModeObj *rmode;
 
-// this will be used during system init
-void *__attribute__((used)) __myArena1Hi = (void*)BS2_BASE_ADDR;
+// Heap upper bound — lowered from BS2_BASE_ADDR (0x81300000) to make room
+// for embedded IPL data section at EMBEDDED_IPL_ADDR (0x81000000-0x81200020).
+// Helper concatenates the IPL ROM as a DOL data section loaded at this address.
+void *__attribute__((used)) __myArena1Hi = (void*)EMBEDDED_IPL_ADDR;
 
 int main(int argc, char **argv) {
     u64 startts, endts;

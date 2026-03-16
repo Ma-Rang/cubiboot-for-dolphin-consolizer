@@ -199,7 +199,9 @@ void apply_additional_patches() {
         return;
 
     // disable exi probe for sd slot
-    const char* dev = emu_get_device(); 
+    const char* dev = emu_get_device();
+    if (dev == NULL)
+        return;  // No SD device (e.g. running on Dolphin) — nothing to patch
     if (strcmp(dev, "sda") == 0) {
         u32 probe_card_0[] = { 0x8131b1c4, 0x8131b8f0, 0x8131bc88, 0x8131bca0, 0x8131c29c, 0x8131b81c, 0x8131c3dc };
         *(u32*)probe_card_0[bios_index] = 0x38600000; // li r3, 0

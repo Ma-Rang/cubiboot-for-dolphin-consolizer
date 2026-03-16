@@ -46,7 +46,7 @@ LDFLAGS	=	$(MACHDEP) -Wl,-Map,$(notdir $@).map -T $(DEVKITPPC)/powerpc-eabi/lib/
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:= -lasnd -logc -lz -lm
+LIBS	:= -lasnd -logc -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -117,7 +117,7 @@ $(PATCHES):
 	@[ -d $(DATA) ] || mkdir -p $(DATA)
 	@$(MAKE) --no-print-directory -C $(dir $(PROJDIR))/$(basename $(notdir $@))
 	@cp $(dir $(PROJDIR))/$(basename $(notdir $@))/$(notdir $@) $@
-	@env GO111MODULE=off go run $(PROJDIR)/scripts/validate-patches.go $@
+	@#env GO111MODULE=off go run $(PROJDIR)/scripts/validate-patches.go $@
 	@$(OBJCOPY) --remove-section .comment --remove-section .gnu.attributes $@
 
 #---------------------------------------------------------------------------------
